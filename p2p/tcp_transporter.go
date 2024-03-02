@@ -16,17 +16,28 @@ type TCPPeer struct {
 	outbound bool
 }
 type TCPTransporter struct {
-	ListenAddr string
-	Listener   net.Listener
+	ListenAddr    string
+	Listener      net.Listener
+	handshakeFunc Handshake
+	decoder       Decoder
+	mu            sync.RWMutex
+	peers         map[net.Addr]Peer
+}
 
-	mu    sync.RWMutex
-	peers map[net.Addr]Peer
+// constructor for TCPPeer
+func NewTPCPeer(conn net.Conn, outbound bool) *TCPPeer {
+	return &TCPPeer{
+		conn:     conn,
+		outbound: outbound,
+	}
+
 }
 
 // here we could've returned Transpoort interface but that would've been bad for teesting because we wouldn't have had access to Listener etc objects
 func NewTCPTransporter(listenAddr string) *TCPTransporter {
 	return &TCPTransporter{
-		ListenAddr: listenAddr,
+		ListenAddr:    listenAddr,
+		handshakeFunc: NOPHandshake,
 	}
 }
 
@@ -49,17 +60,23 @@ func (tr *TCPTransporter) startAcceptLoop() {
 			fmt.Printf("tcp accept conn error %s\n", err)
 		}
 
-		go tr.handleConn(&conn)
+		go tr.handleConn(conn)
 	}
 
 }
 
-func (tr *TCPTransporter) handleConn(conn *net.Conn) {
+func (tr *TCPTransporter) handleConn(conn net.Conn) {
 	peer := TCPPeer{
-		conn: *conn,
+		conn:     conn,
 		outbound: true,
 	}
-	
+
+	// if the handshake has not been established then perhaps disconnect?
+	if err := tr.handshakeFunc(conn); err != nil {
+		fmt.Printf("handshake failed with the remote peer ; %v", err)
+	}
+
+	//if the conn is succesfful then decode the data being sent
 
 	fmt.Printf("the incoming tcp connec %v\n", peer)
 }
