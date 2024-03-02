@@ -15,14 +15,20 @@ type TCPPeer struct {
 	// if we accept conn and retrive the conn -> outbound(since we are making the conn)->>false ---> inbound connecttion
 	outbound bool
 }
-type TCPTransporter struct {
+type TCPTransportOpts struct {
 	ListenAddr    string
-	Listener      net.Listener
-	handshakeFunc Handshake
-	decoder       Decoder
-	mu            sync.RWMutex
-	peers         map[net.Addr]Peer
+	//make them capitalized to make these properties public
+	Handshakefunc Handshake
+	Decoder       Decoder
 }
+type TCPTransporter struct {
+	TCPTransportOpts
+	Listener net.Listener
+	mu       sync.RWMutex
+	peers    map[net.Addr]Peer
+}
+
+type TempMsg struct{}
 
 // constructor for TCPPeer
 func NewTPCPeer(conn net.Conn, outbound bool) *TCPPeer {
@@ -34,10 +40,9 @@ func NewTPCPeer(conn net.Conn, outbound bool) *TCPPeer {
 }
 
 // here we could've returned Transpoort interface but that would've been bad for teesting because we wouldn't have had access to Listener etc objects
-func NewTCPTransporter(listenAddr string) *TCPTransporter {
+func NewTCPTransporter(opts TCPTransportOpts) *TCPTransporter {
 	return &TCPTransporter{
-		ListenAddr:    listenAddr,
-		handshakeFunc: NOPHandshake,
+		TCPTransportOpts: opts,
 	}
 }
 
@@ -60,6 +65,7 @@ func (tr *TCPTransporter) startAcceptLoop() {
 			fmt.Printf("tcp accept conn error %s\n", err)
 		}
 
+		fmt.Printf("the incoming tcp connec %v\n", conn)
 		go tr.handleConn(conn)
 	}
 
@@ -72,11 +78,16 @@ func (tr *TCPTransporter) handleConn(conn net.Conn) {
 	}
 
 	// if the handshake has not been established then perhaps disconnect?
-	if err := tr.handshakeFunc(conn); err != nil {
+	if err := tr.Handshakefunc(peer); err != nil {
 		fmt.Printf("handshake failed with the remote peer ; %v", err)
 	}
 
 	//if the conn is succesfful then decode the data being sent
-
-	fmt.Printf("the incoming tcp connec %v\n", peer)
+	msg := &TempMsg{}
+	for {
+		if err := tr.Decoder.Decode(conn, msg); err != nil {
+			fmt.Printf("error occurred in decoding %v", err.Error())
+			continue
+		}
+	}
 }
