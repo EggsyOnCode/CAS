@@ -16,7 +16,7 @@ type TCPPeer struct {
 	outbound bool
 }
 type TCPTransportOpts struct {
-	ListenAddr    string
+	ListenAddr string
 	//make them capitalized to make these properties public
 	Handshakefunc Handshake
 	Decoder       Decoder
@@ -83,11 +83,16 @@ func (tr *TCPTransporter) handleConn(conn net.Conn) {
 	}
 
 	//if the conn is succesfful then decode the data being sent
-	msg := &TempMsg{}
+	msg := &Message{}
 	for {
 		if err := tr.Decoder.Decode(conn, msg); err != nil {
 			fmt.Printf("error occurred in decoding %v", err.Error())
 			continue
 		}
+
+		//setting the remote addr of the msg sender
+		msg.From = conn.RemoteAddr()
+
+		fmt.Printf("message: %+v\n", msg)
 	}
 }
