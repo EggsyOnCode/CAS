@@ -83,7 +83,7 @@ func (tr *TCPTransporter) handleConn(conn net.Conn) {
 	}
 
 	//if the conn is succesfful then decode the data being sent
-	msg := &Message{}
+	msg := &RPC{}
 	for {
 		if err := tr.Decoder.Decode(conn, msg); err != nil {
 			fmt.Printf("error occurred in decoding %v", err.Error())
