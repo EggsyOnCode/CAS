@@ -1,17 +1,16 @@
 package storage
 
 import (
-	"bytes"
-	"crypto/md5"
 	"crypto/sha1"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"log"
 	"os"
 	"strings"
 )
 
-func CASPathTransformFunc(key string) string {
+func CASPathTransformFunc(key string) Pathkey {
 	//reutnrs a sha1 hash of hte key
 	// eg key
 	hash := sha1.Sum([]byte(key))
@@ -29,15 +28,20 @@ func CASPathTransformFunc(key string) string {
 		from, to := i*blocksize, (i*blocksize)+blocksize
 		paths[i] = hashStr[from:to]
 	}
-
-	return strings.Join(paths, "/")
-	// eg a1357/f312c/e120b/a9b5c/2fbc1/be02e/2a7b6/4e4db
+	return Pathkey{
+		PathName: strings.Join(paths, "/"),
+		// eg a1357/f312c/e120b/a9b5c/2fbc1/be02e/2a7b6/4e4db
+		Original: hashStr,
+	}
 }
 
-type PathTransformFunc func(string) string
+type PathTransformFunc func(string) Pathkey
 
-var DefaultPathName = func(key string) string {
-	return key
+var DefaultPathName = func(key string) Pathkey {
+	return Pathkey{
+		PathName: "path",
+		Original: key,
+	}
 }
 
 type StoreOpts struct {
@@ -48,6 +52,17 @@ type StoreOpts struct {
 // Store will represent a machine that will be responsible for storing files given to it on a Distributed CAS
 type Store struct {
 	StoreOpts
+}
+
+type Pathkey struct {
+	PathName string
+	Original string
+}
+
+func (p *Pathkey) FileName() string {
+	// we can derive a file's path using its filename 
+	// this is imp so that we can retrive it
+	return fmt.Sprintf("%s/%s", p.PathName, p.Original)
 }
 
 func NewStore(opts *StoreOpts) *Store {
@@ -62,26 +77,20 @@ func (s *Store) writeStream(key string, r io.Reader) error {
 	// in that path we'll create a new file
 	// we'll copy the contents of the io.Reader into that buffer/file
 
-	pathName := s.PathTransformFunc(key)
-	err := os.MkdirAll(pathName, os.ModePerm)
+	pathkey := s.PathTransformFunc(key)
+	err := os.MkdirAll(pathkey.PathName, os.ModePerm)
 	if err != nil {
 		return err
 	}
 
-	// temp copying io.Reader bytes content into a buffer
-	buf := new(bytes.Buffer)
-	io.Copy(buf, r)
-	// we also need to hash the filename; i.e the filename is the hash of the contents of the file itself
-	fileName := md5.Sum(buf.Bytes())
-	fileNameStr := hex.EncodeToString(fileName[:])
-	pathAndFileName := pathName + "/" + fileNameStr
+	pathAndFileName := pathkey.FileName()
 	//creating new file
 	file, err := os.Create(pathAndFileName)
 	if err != nil {
 		return nil
 	}
 
-	n, err := io.Copy(file, buf)
+	n, err := io.Copy(file, r)
 	if err != nil {
 		return err
 	}
