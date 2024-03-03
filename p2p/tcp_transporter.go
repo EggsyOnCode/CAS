@@ -86,7 +86,7 @@ func (tr *TCPTransporter) handleConn(conn net.Conn) {
 
 	// this is gonna happen at the end of func regardless of any state?
 	defer func() {
-		fmt.Printf("dropping ur connection \n", err)
+		fmt.Printf("dropping ur connection %v\n", err)
 		conn.Close()
 	}()
 
