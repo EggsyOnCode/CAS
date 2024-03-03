@@ -17,7 +17,7 @@ func TestCASPathTransformFunc(t *testing.T) {
 func TestStore(t *testing.T) {
 	key := "myTestFile.txt"
 	opts := &StoreOpts{
-		PathTransformFunc: DefaultPathName,
+		PathTransformFunc: CASPathTransformFunc,
 	}
 	store := NewStore(opts)
 

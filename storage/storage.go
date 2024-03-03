@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"bytes"
+	"crypto/md5"
 	"crypto/sha1"
 	"encoding/hex"
 	"io"
@@ -29,7 +31,7 @@ func CASPathTransformFunc(key string) string {
 	}
 
 	return strings.Join(paths, "/")
-	// eg a1357/f312c/e120b/a9b5c/2fbc1/be02e/2a7b6/4e4db 
+	// eg a1357/f312c/e120b/a9b5c/2fbc1/be02e/2a7b6/4e4db
 }
 
 type PathTransformFunc func(string) string
@@ -60,21 +62,26 @@ func (s *Store) writeStream(key string, r io.Reader) error {
 	// in that path we'll create a new file
 	// we'll copy the contents of the io.Reader into that buffer/file
 
-	pathName := key
+	pathName := s.PathTransformFunc(key)
 	err := os.MkdirAll(pathName, os.ModePerm)
 	if err != nil {
 		return err
 	}
 
-	fileName := "abc.txt"
-	pathAndFileName := pathName + "/" + fileName
+	// temp copying io.Reader bytes content into a buffer
+	buf := new(bytes.Buffer)
+	io.Copy(buf, r)
+	// we also need to hash the filename; i.e the filename is the hash of the contents of the file itself
+	fileName := md5.Sum(buf.Bytes())
+	fileNameStr := hex.EncodeToString(fileName[:])
+	pathAndFileName := pathName + "/" + fileNameStr
 	//creating new file
 	file, err := os.Create(pathAndFileName)
 	if err != nil {
 		return nil
 	}
 
-	n, err := io.Copy(file, r)
+	n, err := io.Copy(file, buf)
 	if err != nil {
 		return err
 	}
