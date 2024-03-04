@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bytes"
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
@@ -60,13 +61,29 @@ type Pathkey struct {
 }
 
 func (p *Pathkey) FileName() string {
-	// we can derive a file's path using its filename 
+	// we can derive a file's path using its filename
 	// this is imp so that we can retrive it
 	return fmt.Sprintf("%s/%s", p.PathName, p.Original)
 }
 
 func NewStore(opts *StoreOpts) *Store {
 	return &Store{StoreOpts: *opts}
+}
+
+func (s *Store) Read(key string) (io.Reader, error) {
+	f, err := s.readStream(key)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	buf := new(bytes.Buffer)
+	_, err = io.Copy(buf, f)
+	return buf, err
+}
+
+func (s *Store) readStream(key string) (io.ReadCloser, error) {
+	pathkey := s.PathTransformFunc(key)
+	return os.Open(pathkey.FileName())
 }
 
 func (s *Store) writeStream(key string, r io.Reader) error {
