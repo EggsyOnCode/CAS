@@ -6,8 +6,10 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -60,7 +62,7 @@ type Pathkey struct {
 	Original string
 }
 
-func (p *Pathkey) FileName() string {
+func (p *Pathkey) Fullpath() string {
 	// we can derive a file's path using its filename
 	// this is imp so that we can retrive it
 	return fmt.Sprintf("%s/%s", p.PathName, p.Original)
@@ -70,6 +72,41 @@ func NewStore(opts *StoreOpts) *Store {
 	return &Store{StoreOpts: *opts}
 }
 
+// Deleting a file using its key
+func (s *Store) Delete(key string) error {
+	pathkey := s.PathTransformFunc(key)
+	err := os.Remove(pathkey.Fullpath())
+	if err != nil {
+		log.Printf("failed to delete file at path %s: %s", pathkey.Fullpath(), err)
+		return err
+	}
+	log.Printf("file at path %s has been removed", pathkey.Fullpath())
+
+	// Traverse up the directory hierarchy and delete empty directories
+	currentDir := pathkey.PathName
+	for currentDir != "" {
+		files, err := ioutil.ReadDir(currentDir)
+		if err != nil {
+			log.Printf("error reading directory %s: %s", currentDir, err)
+			return err
+		}
+		if len(files) > 0 {
+			break // Directory is not empty, stop traversing
+		}
+		err = os.RemoveAll(currentDir)
+		if err != nil {
+			log.Printf("failed to delete directory %s: %s", currentDir, err)
+			return err
+		}
+		log.Printf("directory %s has been removed", currentDir)
+
+		// Move up to the parent directory
+		currentDir = filepath.Dir(currentDir)
+	}
+	return nil
+}
+
+// Reading file contents using its key
 func (s *Store) Read(key string) (io.Reader, error) {
 	f, err := s.readStream(key)
 	if err != nil {
@@ -83,7 +120,7 @@ func (s *Store) Read(key string) (io.Reader, error) {
 
 func (s *Store) readStream(key string) (io.ReadCloser, error) {
 	pathkey := s.PathTransformFunc(key)
-	return os.Open(pathkey.FileName())
+	return os.Open(pathkey.Fullpath())
 }
 
 func (s *Store) writeStream(key string, r io.Reader) error {
@@ -100,7 +137,7 @@ func (s *Store) writeStream(key string, r io.Reader) error {
 		return err
 	}
 
-	pathAndFileName := pathkey.FileName()
+	pathAndFileName := pathkey.Fullpath()
 	//creating new file
 	file, err := os.Create(pathAndFileName)
 	if err != nil {
