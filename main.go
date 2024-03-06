@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/EggsyOnCode/CAS/p2p"
 	"github.com/EggsyOnCode/CAS/storage"
@@ -28,9 +29,13 @@ func main() {
 
 	fileServer := NewFileServer(fileServerOpts)
 
+	go func() {
+		time.Sleep(time.Second * 3)
+		fileServer.Stop()
+	}()
+
 	if err := fileServer.Start(); err != nil {
 		log.Fatal(err)
 	}
 
-	select {}
 }

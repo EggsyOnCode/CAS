@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -53,6 +54,8 @@ func NewTCPTransporter(opts TCPTransportOpts) *TCPTransporter {
 }
 
 // this syntax means that we cna only read from the channel not write ot it
+// Consume() <- chan means that its receive only channel
+// same is the case when its used in teh struct def
 func (tr *TCPTransporter) Consume() <-chan RPC {
 	return tr.tranch
 }
@@ -71,9 +74,18 @@ func (tr *TCPTransporter) ListenAndAccept() error {
 	return nil
 }
 
+func (tr *TCPTransporter) Close() error {
+	return tr.Listener.Close()
+}
+
 func (tr *TCPTransporter) startAcceptLoop() {
 	for {
 		conn, err := tr.Listener.Accept()
+
+		// when the listener is closed
+		if errors.Is(err, net.ErrClosed) {
+			return
+		}
 		if err != nil {
 			fmt.Printf("tcp accept conn error %s\n", err)
 		}
