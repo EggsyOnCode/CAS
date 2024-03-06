@@ -135,6 +135,10 @@ func (s *Store) readStream(key string) (io.ReadCloser, error) {
 	return os.Open(fullPathWithRoot)
 }
 
+func (s *Store) Write(key string, r io.Reader) error {
+	return s.writeStream(key, r)
+}
+
 func (s *Store) writeStream(key string, r io.Reader) error {
 	// the pathname would be some modified hash of the content of hte file
 	// io.REader thats passed will be holding the byte slice of the file contents

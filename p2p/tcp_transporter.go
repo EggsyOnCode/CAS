@@ -2,6 +2,7 @@ package p2p
 
 import (
 	"fmt"
+	"log"
 	"net"
 )
 
@@ -65,6 +66,8 @@ func (tr *TCPTransporter) ListenAndAccept() error {
 	}
 	//launch a goroutine to handle these new connections
 	go tr.startAcceptLoop()
+
+	log.Printf("TCP listener listening on port: %s", tr.ListenAddr)
 	return nil
 }
 
@@ -99,6 +102,7 @@ func (tr *TCPTransporter) handleConn(conn net.Conn) {
 	if err := tr.Handshakefunc(peer); err != nil {
 		fmt.Printf("handshake failed with the remote peer ; %v", err)
 	}
+
 	// test the OnPeer method
 	if tr.OnPeer != nil {
 		if err = tr.OnPeer(peer); err != nil {
@@ -110,7 +114,7 @@ func (tr *TCPTransporter) handleConn(conn net.Conn) {
 	rpc := RPC{}
 	for {
 		err = tr.Decoder.Decode(conn, &rpc)
-		if err != nil{
+		if err != nil {
 			return
 		}
 		//setting the remote addr of the rpc sender

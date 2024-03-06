@@ -17,21 +17,6 @@ func TestCASPathTransformFunc(t *testing.T) {
 
 }
 
-func TestStoreDelete(t *testing.T) {
-	key := "myTestFile.txt"
-	opts := &StoreOpts{
-		PathTransformFunc: CASPathTransformFunc,
-		Root:              "xenNet",
-	}
-	store := NewStore(opts)
-
-	//reader
-	// test_strig := "this is new jpg file testing for deletion"
-	// r := bytes.NewReader([]byte(test_strig))
-	// assert.Nil(t, store.writeStream(key, r))
-
-	assert.Nil(t, store.Delete(key))
-}
 func TestStore(t *testing.T) {
 	key := "myTestFile.txt"
 	opts := &StoreOpts{
@@ -66,4 +51,20 @@ func TestStoreRead(t *testing.T) {
 	data, _ := io.ReadAll(buf)
 	fmt.Println(string(data))
 	assert.Equal(t, data, r_data)
+}
+
+func TestStoreDelete(t *testing.T) {
+	key := "myTestFile.txt"
+	opts := &StoreOpts{
+		PathTransformFunc: CASPathTransformFunc,
+		Root:              "xenNet",
+	}
+	store := NewStore(opts)
+
+	//reader
+	// test_strig := "this is new jpg file testing for deletion"
+	// r := bytes.NewReader([]byte(test_strig))
+	// assert.Nil(t, store.writeStream(key, r))
+
+	assert.Nil(t, store.Delete(key))
 }
