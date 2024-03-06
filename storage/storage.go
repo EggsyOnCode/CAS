@@ -85,7 +85,8 @@ func NewStore(opts *StoreOpts) *Store {
 // Deleting a file using its key
 func (s *Store) Delete(key string) error {
 	pathkey := s.PathTransformFunc(key)
-	err := os.Remove(s.StoreOpts.Root + "/" + pathkey.Fullpath())
+	fullPathWithRoot := fmt.Sprintf("%s/%s", s.StoreOpts.Root, pathkey.Fullpath())
+	err := os.Remove(fullPathWithRoot)
 	if err != nil {
 		log.Printf("failed to delete file at path %s: %s", pathkey.Fullpath(), err)
 		return err
@@ -130,7 +131,8 @@ func (s *Store) Read(key string) (io.Reader, error) {
 
 func (s *Store) readStream(key string) (io.ReadCloser, error) {
 	pathkey := s.PathTransformFunc(key)
-	return os.Open(s.StoreOpts.Root + "/" + pathkey.Fullpath())
+	fullPathWithRoot := fmt.Sprintf("%s/%s", s.StoreOpts.Root, pathkey.Fullpath())
+	return os.Open(fullPathWithRoot)
 }
 
 func (s *Store) writeStream(key string, r io.Reader) error {
@@ -142,14 +144,15 @@ func (s *Store) writeStream(key string, r io.Reader) error {
 	// we'll copy the contents of the io.Reader into that buffer/file
 
 	pathkey := s.PathTransformFunc(key)
-	err := os.MkdirAll(s.StoreOpts.Root+"/"+pathkey.PathName, os.ModePerm)
+	fullFolderPathWithRoot := s.StoreOpts.Root + "/" + pathkey.PathName
+	err := os.MkdirAll(fullFolderPathWithRoot, os.ModePerm)
 	if err != nil {
 		return err
 	}
 
-	pathAndFileName := pathkey.Fullpath()
+	fullPathWithRoot := fmt.Sprintf("%s/%s", s.StoreOpts.Root, pathkey.Fullpath())
 	//creating new file
-	file, err := os.Create(s.StoreOpts.Root + "/" + pathAndFileName)
+	file, err := os.Create(fullPathWithRoot)
 	if err != nil {
 		return nil
 	}
@@ -159,7 +162,7 @@ func (s *Store) writeStream(key string, r io.Reader) error {
 		return err
 	}
 
-	log.Printf("%d bytes written to disk at location %s", n, pathAndFileName)
+	log.Printf("%d bytes written to disk at location %s", n, fullPathWithRoot)
 
 	return nil
 }
