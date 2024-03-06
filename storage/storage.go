@@ -13,6 +13,8 @@ import (
 	"strings"
 )
 
+var defaultRoot = "xenNet"
+
 func CASPathTransformFunc(key string) Pathkey {
 	//reutnrs a sha1 hash of hte key
 	// eg key
@@ -40,9 +42,9 @@ func CASPathTransformFunc(key string) Pathkey {
 
 type PathTransformFunc func(string) Pathkey
 
-var DefaultPathName = func(key string) Pathkey {
+var DefaultPathTransformFunc = func(key string) Pathkey {
 	return Pathkey{
-		PathName: "path",
+		PathName: key,
 		Original: key,
 	}
 }
@@ -50,6 +52,8 @@ var DefaultPathName = func(key string) Pathkey {
 type StoreOpts struct {
 	// path transform will hash the content of the file given to it then some transformation of it
 	PathTransformFunc PathTransformFunc
+	//root folder name
+	Root string
 }
 
 // Store will represent a machine that will be responsible for storing files given to it on a Distributed CAS
@@ -69,13 +73,19 @@ func (p *Pathkey) Fullpath() string {
 }
 
 func NewStore(opts *StoreOpts) *Store {
+	if opts.PathTransformFunc == nil {
+		opts.PathTransformFunc = DefaultPathTransformFunc
+	}
+	if len(opts.Root) == 0 {
+		opts.Root = defaultRoot
+	}
 	return &Store{StoreOpts: *opts}
 }
 
 // Deleting a file using its key
 func (s *Store) Delete(key string) error {
 	pathkey := s.PathTransformFunc(key)
-	err := os.Remove(pathkey.Fullpath())
+	err := os.Remove(s.StoreOpts.Root + "/" + pathkey.Fullpath())
 	if err != nil {
 		log.Printf("failed to delete file at path %s: %s", pathkey.Fullpath(), err)
 		return err
@@ -83,7 +93,7 @@ func (s *Store) Delete(key string) error {
 	log.Printf("file at path %s has been removed", pathkey.Fullpath())
 
 	// Traverse up the directory hierarchy and delete empty directories
-	currentDir := pathkey.PathName
+	currentDir := s.StoreOpts.Root + "/" + pathkey.PathName
 	for currentDir != "" {
 		files, err := ioutil.ReadDir(currentDir)
 		if err != nil {
@@ -120,7 +130,7 @@ func (s *Store) Read(key string) (io.Reader, error) {
 
 func (s *Store) readStream(key string) (io.ReadCloser, error) {
 	pathkey := s.PathTransformFunc(key)
-	return os.Open(pathkey.Fullpath())
+	return os.Open(s.StoreOpts.Root + "/" + pathkey.Fullpath())
 }
 
 func (s *Store) writeStream(key string, r io.Reader) error {
@@ -132,14 +142,14 @@ func (s *Store) writeStream(key string, r io.Reader) error {
 	// we'll copy the contents of the io.Reader into that buffer/file
 
 	pathkey := s.PathTransformFunc(key)
-	err := os.MkdirAll(pathkey.PathName, os.ModePerm)
+	err := os.MkdirAll(s.StoreOpts.Root+"/"+pathkey.PathName, os.ModePerm)
 	if err != nil {
 		return err
 	}
 
 	pathAndFileName := pathkey.Fullpath()
 	//creating new file
-	file, err := os.Create(pathAndFileName)
+	file, err := os.Create(s.StoreOpts.Root + "/" + pathAndFileName)
 	if err != nil {
 		return nil
 	}

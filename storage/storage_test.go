@@ -21,6 +21,7 @@ func TestStoreDelete(t *testing.T) {
 	key := "myTestFile.txt"
 	opts := &StoreOpts{
 		PathTransformFunc: CASPathTransformFunc,
+		Root:              "xenNet",
 	}
 	store := NewStore(opts)
 
@@ -35,6 +36,7 @@ func TestStore(t *testing.T) {
 	key := "myTestFile.txt"
 	opts := &StoreOpts{
 		PathTransformFunc: CASPathTransformFunc,
+		Root:              "xenNet",
 	}
 	store := NewStore(opts)
 
@@ -51,7 +53,7 @@ func TestStore(t *testing.T) {
 	fmt.Println(string(data))
 	assert.Equal(t, data, r_data)
 }
-func TestStoreRead(t *testing.T){
+func TestStoreRead(t *testing.T) {
 	key := "myTestFile.txt"
 	opts := &StoreOpts{
 		PathTransformFunc: CASPathTransformFunc,
