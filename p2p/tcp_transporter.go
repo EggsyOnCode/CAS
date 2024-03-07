@@ -10,17 +10,12 @@ import (
 // TCPPeer rep the remote node with whom conn is estbalished over TCP
 type TCPPeer struct {
 	// the underlying connection obj rep the conn between server and peer
-	conn net.Conn
+	net.Conn
 
 	// if we dial the conn and retrive the conn -> outbound(since we are making the conn)->>true
 	// if we accept conn and retrive the conn -> outbound(since we are making the conn)->>false ---> inbound connecttion
 	outbound bool
 }
-
-func (p *TCPPeer) Close() error {
-	return p.conn.Close()
-}
-
 type TCPTransportOpts struct {
 	ListenAddr string
 	//make them capitalized to make these properties public
@@ -39,13 +34,20 @@ type TCPTransporter struct {
 // constructor for TCPPeer
 func NewTPCPeer(conn net.Conn, outbound bool) *TCPPeer {
 	return &TCPPeer{
-		conn:     conn,
+		Conn:     conn,
 		outbound: outbound,
 	}
 }
 
-func (tp *TCPPeer) RemoteAddr() net.Addr {
-	return tp.conn.RemoteAddr()
+func (tp *TCPPeer) Send(b []byte) error {
+	n, err := tp.Conn.Write(b)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("%v bytes sent by %s", n, tp.Conn.RemoteAddr().String())
+
+	return nil
 }
 
 // here we could've returned Transpoort interface but that would've been bad for teesting because we wouldn't have had access to Listener etc objects
@@ -120,8 +122,8 @@ func (tr *TCPTransporter) handleConn(conn net.Conn, outbound bool) {
 	}()
 
 	peer := &TCPPeer{
-		conn:     conn,
-		outbound: true,
+		Conn:     conn,
+		outbound: outbound,
 	}
 
 	// if the handshake has not been established then perhaps disconnect?

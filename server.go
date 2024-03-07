@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"encoding/gob"
 	"fmt"
+	"io"
 	"log"
 	"sync"
 
@@ -91,6 +94,41 @@ func (f *FileServer) bootStrapNodes() error {
 		}(address)
 	}
 
+	return nil
+}
+
+type Payload struct {
+	Key  string
+	Data []byte
+}
+
+func (f *FileServer) broadcast(p Payload) error {
+	//treat the peers as io.Writers and stream file to them
+	peers := []io.Writer{}
+	for _, peer := range f.peers {
+		peers = append(peers, peer)
+	}
+
+	//multiwriters
+	mw := io.MultiWriter(peers...)
+	return gob.NewEncoder(mw).Encode(p)
+}
+
+func (f *FileServer) StoreData(key string, r io.Reader) error {
+	//store the file to disk
+
+	if err := f.store.Write(key, r); err != nil {
+		return err
+	}
+
+	//broadcast the file to all known peers in hte network
+	buf := new(bytes.Buffer)
+	_, err := io.Copy(buf, r)
+	if err != nil {
+		return err
+	}
+
+	fmt.Print(buf.Bytes())
 	return nil
 }
 
