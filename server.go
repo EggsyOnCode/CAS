@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"sync"
 
 	"github.com/EggsyOnCode/CAS/p2p"
 	"github.com/EggsyOnCode/CAS/storage"
@@ -23,6 +24,9 @@ type FileServer struct {
 	store *storage.Store
 	// why not msgch for the file server daemon?
 	quitch chan struct{}
+
+	peerLock sync.Mutex
+	peers    map[string]p2p.Peer
 }
 
 func NewFileServer(opts FileServerOpts) *FileServer {
@@ -35,11 +39,23 @@ func NewFileServer(opts FileServerOpts) *FileServer {
 		store:          storage.NewStore(&storeOpts),
 		FileServerOpts: opts,
 		quitch:         make(chan struct{}),
+		peers:          make(map[string]p2p.Peer),
 	}
 
 }
 func (f *FileServer) Stop() {
 	close(f.quitch)
+}
+
+func (f *FileServer) OnPeer(p p2p.Peer) error {
+	f.peerLock.Lock()
+	defer f.peerLock.Unlock()
+
+	f.peers[p.RemoteAddr().String()] = p
+
+	log.Printf("connected with remote peer %s", p.RemoteAddr().String())
+
+	return nil
 }
 
 // we are having loop for the server deaemon to recieve msgs in its channels and process them concurrently

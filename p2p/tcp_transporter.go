@@ -42,7 +42,10 @@ func NewTPCPeer(conn net.Conn, outbound bool) *TCPPeer {
 		conn:     conn,
 		outbound: outbound,
 	}
+}
 
+func (tp *TCPPeer) RemoteAddr() net.Addr {
+	return tp.conn.RemoteAddr()
 }
 
 // here we could've returned Transpoort interface but that would've been bad for teesting because we wouldn't have had access to Listener etc objects
@@ -91,7 +94,7 @@ func (tr *TCPTransporter) startAcceptLoop() {
 		}
 
 		fmt.Printf("the incoming tcp connec %v\n", conn)
-		go tr.handleConn(conn)
+		go tr.handleConn(conn, false)
 	}
 
 }
@@ -103,12 +106,11 @@ func (s *TCPTransporter) Dial(address string) error {
 		return err
 	}
 
-	go s.handleConn(conn)
+	go s.handleConn(conn, true)
 	return nil
 }
 
-
-func (tr *TCPTransporter) handleConn(conn net.Conn) {
+func (tr *TCPTransporter) handleConn(conn net.Conn, outbound bool) {
 	var err error
 
 	// this is gonna happen at the end of func regardless of any state?
