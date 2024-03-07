@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"time"
 
 	"github.com/EggsyOnCode/CAS/p2p"
 	"github.com/EggsyOnCode/CAS/storage"
@@ -11,9 +10,9 @@ import (
 
 func OnPeer(p p2p.Peer) error { fmt.Printf("entertain the peer \n"); return nil }
 
-func main() {
+func makeServer(listenAddr string, nodes ...string) *FileServer {
 	tcpTransporterOpts := p2p.TCPTransportOpts{
-		ListenAddr:    ":3000",
+		ListenAddr:    listenAddr,
 		Handshakefunc: p2p.NOPHandshake,
 		Decoder:       p2p.DefaultDecoder{},
 		OnPeer:        OnPeer,
@@ -22,20 +21,24 @@ func main() {
 	tcpTransporter := p2p.NewTCPTransporter(tcpTransporterOpts)
 
 	fileServerOpts := FileServerOpts{
-		StorageRoot:       "xen_Net",
+		StorageRoot:       listenAddr + "network",
 		PathTransformFunc: storage.CASPathTransformFunc,
 		Transporter:       tcpTransporter,
+		BootstrapNodes:    nodes,
 	}
 
-	fileServer := NewFileServer(fileServerOpts)
+	return NewFileServer(fileServerOpts)
 
+}
+func main() {
+	s1 := makeServer(":3000")
+	s2 := makeServer(":4000", ":3000")
+
+	// could be called in a gorotuine
 	go func() {
-		time.Sleep(time.Second * 3)
-		fileServer.Stop()
+		log.Fatal(s1.Start())
 	}()
 
-	if err := fileServer.Start(); err != nil {
-		log.Fatal(err)
-	}
+	s2.Start()
 
 }

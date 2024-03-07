@@ -96,6 +96,18 @@ func (tr *TCPTransporter) startAcceptLoop() {
 
 }
 
+// implements the Dial interface of Transporter
+func (s *TCPTransporter) Dial(address string) error {
+	conn, err := net.Dial("tcp", address)
+	if err != nil {
+		return err
+	}
+
+	go s.handleConn(conn)
+	return nil
+}
+
+
 func (tr *TCPTransporter) handleConn(conn net.Conn) {
 	var err error
 

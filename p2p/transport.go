@@ -12,4 +12,5 @@ type Transporter interface {
 	// consume will be fed with a channel of RPC messages
 	Consume() <-chan RPC
 	Close() error
+	Dial(string) error
 }
