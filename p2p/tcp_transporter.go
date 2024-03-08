@@ -41,7 +41,9 @@ func NewTPCPeer(conn net.Conn, outbound bool) *TCPPeer {
 		wg:       &sync.WaitGroup{},
 	}
 }
-
+func (tp *TCPPeer) Wg() *sync.WaitGroup {
+	return tp.wg
+}
 func (tp *TCPPeer) Send(b []byte) error {
 	n, err := tp.Conn.Write(b)
 	if err != nil {

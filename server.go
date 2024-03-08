@@ -111,6 +111,7 @@ func (f *FileServer) StoreData(key string, r io.Reader) error {
 	if err := gob.NewEncoder(buf).Encode(msg); err != nil {
 		return err
 	}
+
 	for _, peer := range f.peers {
 		if err := peer.Send(buf.Bytes()); err != nil {
 			return err
@@ -143,6 +144,7 @@ func (f *FileServer) StoreData(key string, r io.Reader) error {
 	// 	Payload: p,
 	// })
 }
+
 // we are having loop for the server deaemon to recieve msgs in its channels and process them concurrently
 // the for {select {}} is used to execure teh select {} indefinitely
 // select {} is used to handle multiple channle operations concurrently in a non-blocking fashion
@@ -174,6 +176,7 @@ func (f *FileServer) loop() {
 				panic(err)
 			}
 			fmt.Printf("the data file received is %v\n", string(b))
+			peer.Wg().Done()
 
 		case <-f.quitch: //when channel quits
 			return
