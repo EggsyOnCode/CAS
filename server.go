@@ -32,6 +32,15 @@ type FileServer struct {
 	peers    map[string]p2p.Peer
 }
 
+type Message struct {
+	Payload any
+}
+
+// type DataMessage struct {
+// 	Key  string
+// 	Data []byte
+// }
+
 func NewFileServer(opts FileServerOpts) *FileServer {
 	storeOpts := storage.StoreOpts{
 		Root:              opts.StorageRoot,
@@ -73,14 +82,37 @@ func (f *FileServer) loop() {
 	}()
 	for {
 		select {
-		case msg := <-f.Transporter.Consume():
-			fmt.Println(msg)
+		case rpc := <-f.Transporter.Consume():
+			var msg Message
+			// decoding the msg
+			if err := gob.NewDecoder(bytes.NewReader(rpc.Payload)).Decode(&msg); err != nil {
+				log.Fatal(err)
+			}
+
+			peer, ok := f.peers[rpc.From.String()]
+			if !ok {
+				log.Fatalf("peer not found %s", rpc.From.String())
+			}
+
+			b := make([]byte, 1024)
+			if _, err := peer.Read(b); err != nil {
+				panic(err)
+			}
+			fmt.Printf("rcvd msg is %+s\n", msg.Payload.([]byte))
 		case <-f.quitch: //when channel quits
 			return
 		}
 	}
 }
 
+// func (f *FileServer) handleMsg(msg *Message) error {
+// 	switch v := msg.Payload.(type) {
+// 	case *DataMessage:
+// 		fmt.Printf("rcvv data is %+v\n", v.Data)
+// 	}
+
+//		return nil
+//	}
 func (f *FileServer) bootStrapNodes() error {
 	for _, address := range f.BootstrapNodes {
 		if len(address) == 0 {
@@ -97,12 +129,7 @@ func (f *FileServer) bootStrapNodes() error {
 	return nil
 }
 
-type Payload struct {
-	Key  string
-	Data []byte
-}
-
-func (f *FileServer) broadcast(p Payload) error {
+func (f *FileServer) broadcast(msg *Message) error {
 	//treat the peers as io.Writers and stream file to them
 	peers := []io.Writer{}
 	for _, peer := range f.peers {
@@ -111,25 +138,51 @@ func (f *FileServer) broadcast(p Payload) error {
 
 	//multiwriters
 	mw := io.MultiWriter(peers...)
-	return gob.NewEncoder(mw).Encode(p)
+	return gob.NewEncoder(mw).Encode(msg)
 }
 
 func (f *FileServer) StoreData(key string, r io.Reader) error {
 	//store the file to disk
-
-	if err := f.store.Write(key, r); err != nil {
-		return err
-	}
-
 	//broadcast the file to all known peers in hte network
+
 	buf := new(bytes.Buffer)
-	_, err := io.Copy(buf, r)
-	if err != nil {
+	msg := Message{
+		Payload: []byte("hello"),
+	}
+	//encode the msg
+	if err := gob.NewEncoder(buf).Encode(msg); err != nil {
 		return err
 	}
+	for _, peer := range f.peers {
+		if err := peer.Send(buf.Bytes()); err != nil {
+			return err
+		}
+	}
 
-	fmt.Print(buf.Bytes())
+	payload := ([]byte("hello"))
+
+	for _, peer := range f.peers {
+		if err := peer.Send(payload); err != nil {
+			return err
+		}
+	}
+
 	return nil
+	// tee := io.TeeReader(r, buf)
+
+	// if err := f.store.Write(key, tee); err != nil {
+	// 	return err
+	// }
+
+	// p := &DataMessage{
+	// 	Key:  key,
+	// 	Data: buf.Bytes(),
+	// }
+	// fmt.Print(buf.Bytes())
+	// return f.broadcast(&Message{
+	// 	From:    "todo",
+	// 	Payload: p,
+	// })
 }
 
 func (f *FileServer) Start() error {

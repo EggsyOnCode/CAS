@@ -39,13 +39,14 @@ func main() {
 	go func() {
 		log.Fatal(s1.Start())
 	}()
-
+	time.Sleep(1 * time.Second)
 	//we need to make this a goroutine so that we can do other stuff whiel the server is starting otherwise the thread would be blocked here
 	go s2.Start()
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	data := bytes.NewReader([]byte("this is my data"))
 
 	s2.StoreData("myprivatefiles", data)
 
+	select {}
 }
