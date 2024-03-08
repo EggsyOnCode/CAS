@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/EggsyOnCode/CAS/p2p"
 	"github.com/EggsyOnCode/CAS/storage"
@@ -70,49 +71,6 @@ func (f *FileServer) OnPeer(p p2p.Peer) error {
 	return nil
 }
 
-// we are having loop for the server deaemon to recieve msgs in its channels and process them concurrently
-// the for {select {}} is used to execure teh select {} indefinitely
-// select {} is used to handle multiple channle operations concurrently in a non-blocking fashion
-func (f *FileServer) loop() {
-	defer func() {
-		log.Println("the server stopped due to user quitting action")
-		if err := f.Transporter.Close(); err != nil {
-			log.Println(err)
-		}
-	}()
-	for {
-		select {
-		case rpc := <-f.Transporter.Consume():
-			var msg Message
-			// decoding the msg
-			if err := gob.NewDecoder(bytes.NewReader(rpc.Payload)).Decode(&msg); err != nil {
-				log.Fatal(err)
-			}
-
-			peer, ok := f.peers[rpc.From.String()]
-			if !ok {
-				log.Fatalf("peer not found %s", rpc.From.String())
-			}
-
-			b := make([]byte, 1024)
-			if _, err := peer.Read(b); err != nil {
-				panic(err)
-			}
-			fmt.Printf("rcvd msg is %+s\n", msg.Payload.([]byte))
-		case <-f.quitch: //when channel quits
-			return
-		}
-	}
-}
-
-// func (f *FileServer) handleMsg(msg *Message) error {
-// 	switch v := msg.Payload.(type) {
-// 	case *DataMessage:
-// 		fmt.Printf("rcvv data is %+v\n", v.Data)
-// 	}
-
-//		return nil
-//	}
 func (f *FileServer) bootStrapNodes() error {
 	for _, address := range f.BootstrapNodes {
 		if len(address) == 0 {
@@ -159,7 +117,8 @@ func (f *FileServer) StoreData(key string, r io.Reader) error {
 		}
 	}
 
-	payload := ([]byte("hello"))
+	time.Sleep(time.Second * 3)
+	payload := ([]byte("LARGE FILE"))
 
 	for _, peer := range f.peers {
 		if err := peer.Send(payload); err != nil {
@@ -184,6 +143,52 @@ func (f *FileServer) StoreData(key string, r io.Reader) error {
 	// 	Payload: p,
 	// })
 }
+// we are having loop for the server deaemon to recieve msgs in its channels and process them concurrently
+// the for {select {}} is used to execure teh select {} indefinitely
+// select {} is used to handle multiple channle operations concurrently in a non-blocking fashion
+func (f *FileServer) loop() {
+	defer func() {
+		log.Println("the server stopped due to user quitting action")
+		if err := f.Transporter.Close(); err != nil {
+			log.Println(err)
+		}
+	}()
+	for {
+		select {
+		case rpc := <-f.Transporter.Consume():
+			var msg Message
+			// decoding the msg
+			if err := gob.NewDecoder(bytes.NewReader(rpc.Payload)).Decode(&msg); err != nil {
+				log.Fatal(err)
+			}
+
+			fmt.Printf("rcvd msg is %+s\n", msg.Payload.([]byte))
+
+			peer, ok := f.peers[rpc.From.String()]
+			if !ok {
+				log.Fatalf("peer not found %s", rpc.From.String())
+			}
+
+			b := make([]byte, 1024)
+			if _, err := peer.Read(b); err != nil {
+				panic(err)
+			}
+			fmt.Printf("the data file received is %v\n", string(b))
+
+		case <-f.quitch: //when channel quits
+			return
+		}
+	}
+}
+
+// func (f *FileServer) handleMsg(msg *Message) error {
+// 	switch v := msg.Payload.(type) {
+// 	case *DataMessage:
+// 		fmt.Printf("rcvv data is %+v\n", v.Data)
+// 	}
+
+//		return nil
+//	}
 
 func (f *FileServer) Start() error {
 	if err := f.Transporter.ListenAndAccept(); err != nil {

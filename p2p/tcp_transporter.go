@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"sync"
 )
 
 // TCPPeer rep the remote node with whom conn is estbalished over TCP
@@ -15,6 +16,7 @@ type TCPPeer struct {
 	// if we dial the conn and retrive the conn -> outbound(since we are making the conn)->>true
 	// if we accept conn and retrive the conn -> outbound(since we are making the conn)->>false ---> inbound connecttion
 	outbound bool
+	wg       *sync.WaitGroup
 }
 type TCPTransportOpts struct {
 	ListenAddr string
@@ -36,6 +38,7 @@ func NewTPCPeer(conn net.Conn, outbound bool) *TCPPeer {
 	return &TCPPeer{
 		Conn:     conn,
 		outbound: outbound,
+		wg:       &sync.WaitGroup{},
 	}
 }
 
@@ -124,6 +127,7 @@ func (tr *TCPTransporter) handleConn(conn net.Conn, outbound bool) {
 	peer := &TCPPeer{
 		Conn:     conn,
 		outbound: outbound,
+		wg:       &sync.WaitGroup{},
 	}
 
 	// if the handshake has not been established then perhaps disconnect?
@@ -147,6 +151,10 @@ func (tr *TCPTransporter) handleConn(conn net.Conn, outbound bool) {
 		}
 		//setting the remote addr of the rpc sender
 		rpc.From = conn.RemoteAddr()
+		peer.wg.Add(1)
+		fmt.Println("waiting till stream is done")
 		tr.tranch <- rpc
+		peer.wg.Wait()
+		fmt.Println("stream is done; continue reading normal loop")
 	}
 }
