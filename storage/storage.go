@@ -135,11 +135,12 @@ func (s *Store) readStream(key string) (io.ReadCloser, error) {
 	return os.Open(fullPathWithRoot)
 }
 
-func (s *Store) Write(key string, r io.Reader) error {
+func (s *Store) Write(key string, r io.Reader) (int64,error) {
 	return s.writeStream(key, r)
 }
 
-func (s *Store) writeStream(key string, r io.Reader) error {
+//returns file size being streamed
+func (s *Store) writeStream(key string, r io.Reader) (int64,error) {
 	// the pathname would be some modified hash of the content of hte file
 	// io.REader thats passed will be holding the byte slice of the file contents
 
@@ -151,22 +152,22 @@ func (s *Store) writeStream(key string, r io.Reader) error {
 	fullFolderPathWithRoot := s.StoreOpts.Root + "/" + pathkey.PathName
 	err := os.MkdirAll(fullFolderPathWithRoot, os.ModePerm)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	fullPathWithRoot := fmt.Sprintf("%s/%s", s.StoreOpts.Root, pathkey.Fullpath())
 	//creating new file
 	file, err := os.Create(fullPathWithRoot)
 	if err != nil {
-		return nil
+		return 0, nil
 	}
 
 	n, err := io.Copy(file, r)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	log.Printf("%d bytes written to disk at location %s", n, fullPathWithRoot)
 
-	return nil
+	return n, nil
 }
