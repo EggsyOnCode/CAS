@@ -47,6 +47,10 @@ type MessageStoreFile struct {
 	Size int64
 }
 
+type MessageGetFile struct {
+	Key string
+}
+
 // type DataMessage struct {
 // 	Key  string
 // 	Data []byte
@@ -97,7 +101,7 @@ func (f *FileServer) bootStrapNodes() error {
 	return nil
 }
 
-func (f *FileServer) broadcast(msg *Message) error {
+func (f *FileServer) stream(msg *Message) error {
 	//treat the peers as io.Writers and stream file to them
 	peers := []io.Writer{}
 	for _, peer := range f.peers {
@@ -109,12 +113,48 @@ func (f *FileServer) broadcast(msg *Message) error {
 	return gob.NewEncoder(mw).Encode(msg)
 }
 
+func (f *FileServer) broadcast(msg *Message) error {
+	msgBuf := new(bytes.Buffer)
+	//encode the msg
+	if err := gob.NewEncoder(msgBuf).Encode(msg); err != nil {
+		return err
+	}
+
+	for _, peer := range f.peers {
+		if err := peer.Send(msgBuf.Bytes()); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (f *FileServer) Get(key string) (io.Reader, error) {
+	if f.store.Has(key) {
+		return f.store.Read(key)
+	}
+
+	fmt.Printf("file not found in local store, fetching from network\n")
+
+	msg := Message{
+		Payload: MessageGetFile{
+			Key: key,
+		},
+	}
+
+	if err := f.broadcast(&msg); err != nil {
+		return nil, err
+	}
+
+	select {}
+	return nil, nil
+}
+
 func (f *FileServer) StoreData(key string, r io.Reader) error {
 	//store the file to disk
 	//broadcast the file to all known peers in hte network
 
-	buf := new(bytes.Buffer)
-	tee := io.TeeReader(r, buf)
+	fileBuffer := new(bytes.Buffer)
+	tee := io.TeeReader(r, fileBuffer)
 	//returned is file size
 	size, err := f.store.Write(key, tee)
 	if err != nil {
@@ -127,23 +167,17 @@ func (f *FileServer) StoreData(key string, r io.Reader) error {
 		},
 	}
 
-	msgBuf := new(bytes.Buffer)
-	//encode the msg
-	if err := gob.NewEncoder(msgBuf).Encode(msg); err != nil {
+	if err := f.broadcast(&msg); err != nil {
 		return err
 	}
-
-	for _, peer := range f.peers {
-		if err := peer.Send(msgBuf.Bytes()); err != nil {
-			return err
-		}
-	}
 	time.Sleep(time.Second * 3)
+
+	//add multiwriters here to write buf filebuff into the peers
 
 	// data from buf i.e hte file data is being copied over to each peer (in the network)
 	// because peer is also an io.Writer so we can use io.Copy to copy the data to it
 	for _, peer := range f.peers {
-		n, err := io.Copy(peer, buf)
+		n, err := io.Copy(peer, fileBuffer)
 		if err != nil {
 			return err
 		}
@@ -199,9 +233,11 @@ func (f *FileServer) handleMsgStoreData(from string, msg MessageStoreFile) error
 		log.Fatalf("peer not found %s", from)
 	}
 	fmt.Printf("rcv msg is %v\n", msg.Key)
-	if _, err := f.store.Write(msg.Key, io.LimitReader(peer, msg.Size)); err != nil {
+	n, err := f.store.Write(msg.Key, io.LimitReader(peer, msg.Size))
+	if err != nil {
 		return err
 	}
+	log.Printf("%d bytes written to disk", n)
 	peer.Wg().Done()
 	return nil
 }

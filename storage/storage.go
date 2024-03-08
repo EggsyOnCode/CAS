@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -71,6 +72,13 @@ func (p *Pathkey) Fullpath() string {
 	// this is imp so that we can retrive it
 	return fmt.Sprintf("%s/%s", p.PathName, p.Original)
 }
+func (s *Store) Has(key string) bool {
+	pathKey := s.PathTransformFunc(key)
+	fullPathWithRoot := fmt.Sprintf("%s/%s/%s", s.Root, pathKey.Fullpath())
+
+	_, err := os.Stat(fullPathWithRoot)
+	return !errors.Is(err, os.ErrNotExist)
+}
 
 func NewStore(opts *StoreOpts) *Store {
 	if opts.PathTransformFunc == nil {
@@ -135,12 +143,12 @@ func (s *Store) readStream(key string) (io.ReadCloser, error) {
 	return os.Open(fullPathWithRoot)
 }
 
-func (s *Store) Write(key string, r io.Reader) (int64,error) {
+func (s *Store) Write(key string, r io.Reader) (int64, error) {
 	return s.writeStream(key, r)
 }
 
-//returns file size being streamed
-func (s *Store) writeStream(key string, r io.Reader) (int64,error) {
+// returns file size being streamed
+func (s *Store) writeStream(key string, r io.Reader) (int64, error) {
 	// the pathname would be some modified hash of the content of hte file
 	// io.REader thats passed will be holding the byte slice of the file contents
 
@@ -166,8 +174,6 @@ func (s *Store) writeStream(key string, r io.Reader) (int64,error) {
 	if err != nil {
 		return 0, err
 	}
-
-	log.Printf("%d bytes written to disk at location %s", n, fullPathWithRoot)
 
 	return n, nil
 }
