@@ -122,8 +122,19 @@ func (s *Store) Delete(key string) error {
 	}
 	return nil
 }
+//returns the fileSize of a file given its key
+func (s *Store) GetFileSize(key string) (int64, error) {
+	pathkey := s.PathTransformFunc(key)
+	fullPathWithRoot := fmt.Sprintf("%s/%s", s.StoreOpts.Root, pathkey.Fullpath())
+	fil, err := os.Stat(fullPathWithRoot)
+	if err != nil{
+		return 0, err
+	}
+	return fil.Size(), nil
+}
 
 // Reading file contents using its key
+//TODO: instead of copying the returned reader to a buffer, we can return the reader directly
 func (s *Store) Read(key string) (io.Reader, error) {
 	f, err := s.readStream(key)
 	if err != nil {

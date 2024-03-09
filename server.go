@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/gob"
 	"fmt"
 	"io"
@@ -121,7 +122,7 @@ func (f *FileServer) broadcast(msg *Message) error {
 	return nil
 }
 
-//it will look for the file in the local store and if not found it will fetch it from the network
+// it will look for the file in the local store and if not found it will fetch it from the network
 // and store it in its local store with the exact same pathName
 func (f *FileServer) Get(key string) (io.Reader, error) {
 	if f.store.Has(key) {
@@ -139,8 +140,12 @@ func (f *FileServer) Get(key string) (io.Reader, error) {
 	if err := f.broadcast(&msg); err != nil {
 		return nil, err
 	}
+	time.Sleep(time.Microsecond * 10)
 	for _, peer := range f.peers {
-		n, err := f.store.Write(key, io.LimitReader(peer, 22))
+		// reading file size first to limit hte reading bytes sot htat hte reader doesnt' hang
+		var fileSize int64
+		binary.Read(peer, binary.LittleEndian, &fileSize)
+		n, err := f.store.Write(key, io.LimitReader(peer, fileSize))
 		if err != nil {
 			return nil, err
 		}
@@ -173,7 +178,7 @@ func (f *FileServer) StoreData(key string, r io.Reader) error {
 	if err := f.broadcast(&msg); err != nil {
 		return err
 	}
-	time.Sleep(time.Microsecond * 5)
+	time.Sleep(time.Microsecond * 10)
 
 	//add multiwriters here to write buf filebuff into the peers
 
@@ -243,19 +248,33 @@ func (f *FileServer) handleMsgGetData(from string, msg MessageGetFile) error {
 	if err != nil {
 		return err
 	}
+	//closing the io.Reader that is retrieved above
+	temp, ok := file.(io.ReadCloser)
+	if ok {
+		fmt.Println("closing the file")
+		defer temp.Close()
+	}
 
 	peer, ok := f.peers[from]
 	if !ok {
 		return fmt.Errorf("peer not found %s", from)
 	}
 
+	//send an incoming message flag and then send the actual file size as an int64
 	peer.Send([]byte{p2p.IncomingStream})
+	fileSize, err := f.store.GetFileSize(msg.Key)
+	log.Printf("file size is %d\n", fileSize)
+	if err != nil {
+		return err
+	}
+	binary.Write(peer, binary.LittleEndian, fileSize)
+
 	n, err := io.Copy(peer, file)
 	if err != nil {
 		return err
 	}
 
-	log.Printf("%d bytes sent to %s", n, from)
+	log.Printf("%d bytes sent to %s\n", n, from)
 	return nil
 
 }

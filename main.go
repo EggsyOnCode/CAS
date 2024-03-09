@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
-	"io/ioutil"
 	"log"
+	"os"
 	"time"
 
 	"github.com/EggsyOnCode/CAS/p2p"
@@ -45,21 +47,39 @@ func main() {
 	go s2.Start()
 	time.Sleep(2 * time.Second)
 
-	// for i := 0; i < 3; i++ {
-	// 	data := bytes.NewReader([]byte(fmt.Sprintf("this is new jpg file %d", i)))
-	// 	s2.StoreData(fmt.Sprintf("myprivateData_%d", i), data)
-	// 	time.Sleep(5 * time.Millisecond)
+	pic, err := os.Open("./assets/testpic.jpg")
+	if err != nil {
+		log.Fatal(err)
+
+	}
+	defer pic.Close()
+	size, err := pic.Stat()
+	if err != nil {
+		log.Fatal(err)
+	}
+	picBuf := make([]byte, size.Size())
+	if _, err := bufio.NewReader(pic).Read(picBuf); err != nil {
+		log.Fatal(err)
+	}
+
+	for i := 1; i < 2; i++ {
+		data := bytes.NewReader(picBuf)
+		s2.StoreData(fmt.Sprintf("pic_%d", i), data)
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	// for i := 1; i < 4; i++ {
+
+	// 	n, err := s2.Get(fmt.Sprintf("pic_%d", i))
+	// 	if err != nil {
+	// 		log.Fatal(err)
+	// 	}
+
+	// 	b, err := ioutil.ReadAll(n)
+	// 	if err != nil {
+	// 		log.Fatal(err)
+	// 	}
+	// 	fmt.Printf("{%s} is the data of ur file\n", string(b))
 	// }
-
-	n, err := s2.Get("myprivateData_2")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	b, err := ioutil.ReadAll(n)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Printf("{%s} is the data of ur file\n", string(b))
 	select {}
 }
