@@ -37,10 +37,6 @@ type Message struct {
 	Payload any
 }
 
-func init() {
-	gob.Register(MessageStoreFile{})
-}
-
 // defining the types of messages
 type MessageStoreFile struct {
 	Key  string
@@ -50,11 +46,6 @@ type MessageStoreFile struct {
 type MessageGetFile struct {
 	Key string
 }
-
-// type DataMessage struct {
-// 	Key  string
-// 	Data []byte
-// }
 
 func NewFileServer(opts FileServerOpts) *FileServer {
 	storeOpts := storage.StoreOpts{
@@ -121,6 +112,8 @@ func (f *FileServer) broadcast(msg *Message) error {
 	}
 
 	for _, peer := range f.peers {
+		//send the msg typ to the peer
+		peer.Send([]byte{p2p.IncomingMessage})
 		if err := peer.Send(msgBuf.Bytes()); err != nil {
 			return err
 		}
@@ -143,6 +136,19 @@ func (f *FileServer) Get(key string) (io.Reader, error) {
 
 	if err := f.broadcast(&msg); err != nil {
 		return nil, err
+	}
+	for _, peer := range f.peers {
+		fmt.Println("receiving stream from remote peer", peer.RemoteAddr().String())
+
+		fileBuffer := new(bytes.Buffer)
+		n, err := io.Copy(fileBuffer, peer)
+		if err != nil {
+			// CAREFUL: we can;t be sending err or nil reader here
+			// since there are many peers and just because one peer is unable to send the file doesn't mean others can't
+			return nil, err
+		}
+		fmt.Printf("received %d bytes from %s\n", n, peer.RemoteAddr().String())
+		fmt.Println("receeived file", fileBuffer.String())
 	}
 
 	select {}
@@ -170,19 +176,20 @@ func (f *FileServer) StoreData(key string, r io.Reader) error {
 	if err := f.broadcast(&msg); err != nil {
 		return err
 	}
-	time.Sleep(time.Second * 3)
+	time.Sleep(time.Microsecond * 5)
 
 	//add multiwriters here to write buf filebuff into the peers
 
 	// data from buf i.e hte file data is being copied over to each peer (in the network)
 	// because peer is also an io.Writer so we can use io.Copy to copy the data to it
 	for _, peer := range f.peers {
+		peer.Send([]byte{p2p.IncomingStream})
 		n, err := io.Copy(peer, fileBuffer)
 		if err != nil {
 			return err
 		}
 
-		fmt.Printf("sent %d bytes to %s\n", n, peer.RemoteAddr().String())
+		fmt.Printf("[%s] sent %d bytes to %s\n", f.Transporter.Addr(), n, peer.RemoteAddr().String())
 	}
 	return nil
 }
@@ -192,7 +199,7 @@ func (f *FileServer) StoreData(key string, r io.Reader) error {
 // select {} is used to handle multiple channle operations concurrently in a non-blocking fashion
 func (f *FileServer) loop() {
 	defer func() {
-		log.Println("the server stopped due to user quitting action")
+		log.Println("the server stopped due to error or user quitting action")
 		if err := f.Transporter.Close(); err != nil {
 			log.Println(err)
 		}
@@ -203,12 +210,11 @@ func (f *FileServer) loop() {
 			var msg Message
 			// decoding the msg
 			if err := gob.NewDecoder(bytes.NewReader(rpc.Payload)).Decode(&msg); err != nil {
-				log.Fatal(err)
-				return
+				log.Printf("error decoding msg %s", err)
+
 			}
 			if err := f.handleMsg(rpc.From.String(), &msg); err != nil {
-				log.Println(err)
-				return
+				log.Printf("error handling msg %s", err)
 			}
 
 		case <-f.quitch: //when channel quits
@@ -221,11 +227,40 @@ func (f *FileServer) handleMsg(from string, msg *Message) error {
 	switch v := msg.Payload.(type) {
 	case MessageStoreFile:
 		return f.handleMsgStoreData(from, v)
+	case MessageGetFile:
+		return f.handleMsgGetData(from, v)
 	}
 
 	return nil
 }
 
+func (f *FileServer) handleMsgGetData(from string, msg MessageGetFile) error {
+	//check if the file is in the local store
+	if !f.store.Has(msg.Key) {
+		return fmt.Errorf("need to serve file (%s) but file not found", msg.Key)
+	}
+
+	//fetch the file from the network
+	//send the file to the requesting peer
+	file, err := f.store.Read(msg.Key)
+	if err != nil {
+		return err
+	}
+
+	peer, ok := f.peers[from]
+	if !ok {
+		return fmt.Errorf("peer not found %s", from)
+	}
+
+	n, err := io.Copy(peer, file)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("%d bytes sent to %s", n, from)
+	return nil
+
+}
 func (f *FileServer) handleMsgStoreData(from string, msg MessageStoreFile) error {
 
 	peer, ok := f.peers[from]
@@ -237,7 +272,7 @@ func (f *FileServer) handleMsgStoreData(from string, msg MessageStoreFile) error
 	if err != nil {
 		return err
 	}
-	log.Printf("%d bytes written to disk", n)
+	log.Printf("[%s] wrote %d bytes to disk", f.Transporter.Addr(), n)
 	peer.Wg().Done()
 	return nil
 }
@@ -254,5 +289,6 @@ func (f *FileServer) Start() error {
 }
 
 func init() {
+	gob.Register(MessageGetFile{})
 	gob.Register(MessageStoreFile{})
 }

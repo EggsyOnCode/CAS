@@ -24,8 +24,6 @@ func CASPathTransformFunc(key string) Pathkey {
 	//hashStr rep the hex encoded hash of the key like 0xsdfsdf
 	hashStr := hex.EncodeToString(hash[:])
 	// eg: a1357f312ce120ba9b5c2fbc1be02e2a7b64e4db
-	log.Printf(" hash str is %s", hashStr)
-
 	blocksize := 5
 	sliceLen := len(hashStr) / blocksize
 	paths := make([]string, sliceLen)

@@ -59,7 +59,7 @@ func (tp *TCPPeer) Send(b []byte) error {
 func NewTCPTransporter(opts TCPTransportOpts) *TCPTransporter {
 	return &TCPTransporter{
 		TCPTransportOpts: opts,
-		tranch:           make(chan RPC),
+		tranch:           make(chan RPC, 1024),
 	}
 }
 
@@ -69,7 +69,9 @@ func NewTCPTransporter(opts TCPTransportOpts) *TCPTransporter {
 func (tr *TCPTransporter) Consume() <-chan RPC {
 	return tr.tranch
 }
-
+func (tr *TCPTransporter) Addr() string {
+	return tr.ListenAddr
+}
 func (tr *TCPTransporter) ListenAndAccept() error {
 	var err error
 	//listen to the address speciified int tcp.listenAddr
@@ -145,18 +147,21 @@ func (tr *TCPTransporter) handleConn(conn net.Conn, outbound bool) {
 	}
 
 	//if the conn is succesfful then decode the data being sent
-	rpc := RPC{}
 	for {
+		rpc := RPC{}
 		err = tr.Decoder.Decode(conn, &rpc)
 		if err != nil {
 			return
 		}
-		//setting the remote addr of the rpc sender
 		rpc.From = conn.RemoteAddr()
-		peer.wg.Add(1)
-		fmt.Println("waiting till stream is done")
+		//setting the remote addr of the rpc sender
+		if rpc.Stream {
+			peer.wg.Add(1)
+			fmt.Printf("[%s] waiting till stream is done\n", conn.RemoteAddr().String())
+			peer.wg.Wait()
+			fmt.Printf("[%s] stream is done; continue reading normal loop\n", conn.RemoteAddr().String())
+			continue
+		}
 		tr.tranch <- rpc
-		peer.wg.Wait()
-		fmt.Println("stream is done; continue reading normal loop")
 	}
 }
