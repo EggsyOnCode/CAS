@@ -41,8 +41,9 @@ func NewTPCPeer(conn net.Conn, outbound bool) *TCPPeer {
 		wg:       &sync.WaitGroup{},
 	}
 }
-func (tp *TCPPeer) Wg() *sync.WaitGroup {
-	return tp.wg
+//implements the CloseStream method of the Peer interface
+func (tp *TCPPeer) CloseStream() {
+	tp.wg.Done()
 }
 func (tp *TCPPeer) Send(b []byte) error {
 	n, err := tp.Conn.Write(b)

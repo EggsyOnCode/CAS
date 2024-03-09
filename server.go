@@ -273,7 +273,7 @@ func (f *FileServer) handleMsgStoreData(from string, msg MessageStoreFile) error
 		return err
 	}
 	log.Printf("[%s] wrote %d bytes to disk", f.Transporter.Addr(), n)
-	peer.Wg().Done()
+	peer.CloseStream()
 	return nil
 }
 func (f *FileServer) Start() error {

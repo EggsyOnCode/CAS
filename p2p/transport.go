@@ -2,16 +2,14 @@ package p2p
 
 import (
 	"net"
-	"sync"
 )
-
 
 // Peer rep the remote node client
 type Peer interface {
 	// every peer must implement this so that we can close the conn with them
 	net.Conn
 	Send([]byte) error
-	Wg() *sync.WaitGroup
+	CloseStream()
 }
 
 // Transporter ; the interface that the transporter implement i.e tcp,udp,websockets etc have to conform to

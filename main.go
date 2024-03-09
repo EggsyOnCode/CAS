@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"time"
 
@@ -46,7 +47,7 @@ func main() {
 
 	for i := 0; i < 3; i++ {
 		data := bytes.NewReader([]byte("this is my data"))
-		s2.StoreData("myprivatefiles", data)
+		s2.StoreData(fmt.Sprintf("myprivateData_%d", i), data)
 		time.Sleep(5 * time.Millisecond)
 	}
 
