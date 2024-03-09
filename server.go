@@ -121,6 +121,8 @@ func (f *FileServer) broadcast(msg *Message) error {
 	return nil
 }
 
+//it will look for the file in the local store and if not found it will fetch it from the network
+// and store it in its local store with the exact same pathName
 func (f *FileServer) Get(key string) (io.Reader, error) {
 	if f.store.Has(key) {
 		return f.store.Read(key)
@@ -138,21 +140,16 @@ func (f *FileServer) Get(key string) (io.Reader, error) {
 		return nil, err
 	}
 	for _, peer := range f.peers {
-		fmt.Println("receiving stream from remote peer", peer.RemoteAddr().String())
-
-		fileBuffer := new(bytes.Buffer)
-		n, err := io.Copy(fileBuffer, peer)
+		n, err := f.store.Write(key, io.LimitReader(peer, 22))
 		if err != nil {
-			// CAREFUL: we can;t be sending err or nil reader here
-			// since there are many peers and just because one peer is unable to send the file doesn't mean others can't
 			return nil, err
 		}
-		fmt.Printf("received %d bytes from %s\n", n, peer.RemoteAddr().String())
-		fmt.Println("receeived file", fileBuffer.String())
+		fmt.Printf("[%s] received %d bytes from %s\n", f.Transporter.Addr(), n, peer.RemoteAddr().String())
+
+		peer.CloseStream()
 	}
 
-	select {}
-	return nil, nil
+	return f.store.Read(key)
 }
 
 func (f *FileServer) StoreData(key string, r io.Reader) error {
@@ -252,6 +249,7 @@ func (f *FileServer) handleMsgGetData(from string, msg MessageGetFile) error {
 		return fmt.Errorf("peer not found %s", from)
 	}
 
+	peer.Send([]byte{p2p.IncomingStream})
 	n, err := io.Copy(peer, file)
 	if err != nil {
 		return err
