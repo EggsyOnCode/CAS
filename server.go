@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/EggsyOnCode/CAS/encrypt"
 	"github.com/EggsyOnCode/CAS/p2p"
 	"github.com/EggsyOnCode/CAS/storage"
 )
@@ -18,6 +19,7 @@ import (
 // will allow one peer to fetch and query files from the network, store htem on hte network etc...
 
 type FileServerOpts struct {
+	EncKey            []byte
 	StorageRoot       string
 	PathTransformFunc storage.PathTransformFunc
 	Transporter       p2p.Transporter
@@ -170,8 +172,9 @@ func (f *FileServer) StoreData(key string, r io.Reader) error {
 	}
 	msg := Message{
 		Payload: MessageStoreFile{
-			Key:  key,
-			Size: size,
+			Key: key,
+			//added 16 cuz we are prepending a nonce to the encrypted file of the data
+			Size: size + 16,
 		},
 	}
 
@@ -186,7 +189,7 @@ func (f *FileServer) StoreData(key string, r io.Reader) error {
 	// because peer is also an io.Writer so we can use io.Copy to copy the data to it
 	for _, peer := range f.peers {
 		peer.Send([]byte{p2p.IncomingStream})
-		n, err := io.Copy(peer, fileBuffer)
+		n, err := encrypt.CopyEncrypt(f.EncKey, fileBuffer, peer)
 		if err != nil {
 			return err
 		}

@@ -1,4 +1,4 @@
-package crypto
+package encrypt
 
 import (
 	"crypto/aes"
@@ -7,13 +7,13 @@ import (
 	"io"
 )
 
-func newEncryptionKey() []byte {
+func NewEncryptionKey() []byte {
 	keyBuf := make([]byte, 32)
 	io.ReadFull(rand.Reader, keyBuf)
 	return keyBuf
 }
 
-func copyDecrypt(key []byte, src io.Reader, dst io.Writer) (int, error) {
+func CopyDecrypt(key []byte, src io.Reader, dst io.Writer) (int, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return 0, err
@@ -21,6 +21,7 @@ func copyDecrypt(key []byte, src io.Reader, dst io.Writer) (int, error) {
 
 	// Read the IV from the given io.Reader which, in our case should be the
 	// the block.BlockSize() bytes we read.
+	//iv here is a nonce 
 	iv := make([]byte, block.BlockSize())
 	if _, err := src.Read(iv); err != nil {
 		return 0, err
@@ -29,14 +30,17 @@ func copyDecrypt(key []byte, src io.Reader, dst io.Writer) (int, error) {
 	var (
 		buf    = make([]byte, 32*1024)
 		stream = cipher.NewCTR(block, iv)
+		nw  = block.BlockSize()
 	)
 	for {
 		n, err := src.Read(buf)
 		if n > 0 {
 			stream.XORKeyStream(buf, buf[:n])
-			if _, err := dst.Write(buf[:n]); err != nil {
+			nn, err := dst.Write(buf[:n]) 
+			if err != nil {
 				return 0, err
 			}
+			nw += nn
 		}
 		if err == io.EOF {
 			break
@@ -45,10 +49,10 @@ func copyDecrypt(key []byte, src io.Reader, dst io.Writer) (int, error) {
 			return 0, err
 		}
 	}
-	return 0, nil
+	return nw, nil
 }
 
-func copyEncrypt(key []byte, src io.Reader, dst io.Writer) (int, error) {
+func CopyEncrypt(key []byte, src io.Reader, dst io.Writer) (int, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return 0, err
@@ -67,14 +71,17 @@ func copyEncrypt(key []byte, src io.Reader, dst io.Writer) (int, error) {
 	var (
 		buf    = make([]byte, 32*1024)
 		stream = cipher.NewCTR(block, iv)
+		nw = block.BlockSize()
 	)
 	for {
 		n, err := src.Read(buf)
 		if n > 0 {
 			stream.XORKeyStream(buf, buf[:n])
-			if _, err := dst.Write(buf[:n]); err != nil {
+			nn, err := dst.Write(buf[:n]) 
+			if err != nil {
 				return 0, err
 			}
+			nw += nn
 		}
 		if err == io.EOF {
 			break
@@ -83,5 +90,5 @@ func copyEncrypt(key []byte, src io.Reader, dst io.Writer) (int, error) {
 			return 0, err
 		}
 	}
-	return 0, nil
+	return nw, nil
 }

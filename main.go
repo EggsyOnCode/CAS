@@ -1,13 +1,12 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"log"
-	"os"
 	"time"
 
+	"github.com/EggsyOnCode/CAS/encrypt"
 	"github.com/EggsyOnCode/CAS/p2p"
 	"github.com/EggsyOnCode/CAS/storage"
 )
@@ -22,6 +21,7 @@ func makeServer(listenAddr string, nodes ...string) *FileServer {
 	tcpTransporter := p2p.NewTCPTransporter(tcpTransporterOpts)
 
 	fileServerOpts := FileServerOpts{
+		EncKey:            encrypt.NewEncryptionKey(),
 		StorageRoot:       listenAddr + "network",
 		PathTransformFunc: storage.CASPathTransformFunc,
 		Transporter:       tcpTransporter,
@@ -47,23 +47,24 @@ func main() {
 	go s2.Start()
 	time.Sleep(2 * time.Second)
 
-	pic, err := os.Open("./assets/testpic.jpg")
-	if err != nil {
-		log.Fatal(err)
+	// pic, err := os.Open("./assets/testpic.jpg")
+	// if err != nil {
+	// 	log.Fatal(err)
 
-	}
-	defer pic.Close()
-	size, err := pic.Stat()
-	if err != nil {
-		log.Fatal(err)
-	}
-	picBuf := make([]byte, size.Size())
-	if _, err := bufio.NewReader(pic).Read(picBuf); err != nil {
-		log.Fatal(err)
-	}
+	// }
+	// defer pic.Close()
+	// size, err := pic.Stat()
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// picBuf := make([]byte, size.Size())
+	// if _, err := bufio.NewReader(pic).Read(picBuf); err != nil {
+	// 	log.Fatal(err)
+	// }
 
 	for i := 1; i < 2; i++ {
-		data := bytes.NewReader(picBuf)
+		var testData []byte = []byte("this is new jpg file")
+		data := bytes.NewReader(testData)
 		s2.StoreData(fmt.Sprintf("pic_%d", i), data)
 		time.Sleep(5 * time.Millisecond)
 	}
