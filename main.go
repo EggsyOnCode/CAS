@@ -47,6 +47,7 @@ func main() {
 	go s2.Start()
 	time.Sleep(2 * time.Second)
 
+	// testing by storing a pic in the network
 	// pic, err := os.Open("./assets/testpic.jpg")
 	// if err != nil {
 	// 	log.Fatal(err)
