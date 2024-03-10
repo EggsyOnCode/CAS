@@ -12,6 +12,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/EggsyOnCode/CAS/encrypt"
 )
 
 var defaultRoot = "xenNet"
@@ -115,26 +117,27 @@ func (s *Store) Delete(key string) error {
 			log.Printf("failed to delete directory %s: %s", currentDir, err)
 			return err
 		}
-		log.Printf("directory %s has been removed", currentDir)
+		// log.Printf("directory %s has been removed", currentDir)
 
 		// Move up to the parent directory
 		currentDir = filepath.Dir(currentDir)
 	}
 	return nil
 }
-//returns the fileSize of a file given its key
+
+// returns the fileSize of a file given its key
 func (s *Store) GetFileSize(key string) (int64, error) {
 	pathkey := s.PathTransformFunc(key)
 	fullPathWithRoot := fmt.Sprintf("%s/%s", s.StoreOpts.Root, pathkey.Fullpath())
 	fil, err := os.Stat(fullPathWithRoot)
-	if err != nil{
+	if err != nil {
 		return 0, err
 	}
 	return fil.Size(), nil
 }
 
 // Reading file contents using its key
-//TODO: instead of copying the returned reader to a buffer, we can return the reader directly
+// TODO: instead of copying the returned reader to a buffer, we can return the reader directly
 func (s *Store) Read(key string) (io.Reader, error) {
 	f, err := s.readStream(key)
 	if err != nil {
@@ -154,6 +157,29 @@ func (s *Store) readStream(key string) (io.ReadCloser, error) {
 
 func (s *Store) Write(key string, r io.Reader) (int64, error) {
 	return s.writeStream(key, r)
+}
+
+func (s *Store) WriteDecrypt(encKey []byte, key string, r io.Reader) (int64, error) {
+	pathkey := s.PathTransformFunc(key)
+	fullFolderPathWithRoot := s.StoreOpts.Root + "/" + pathkey.PathName
+	err := os.MkdirAll(fullFolderPathWithRoot, os.ModePerm)
+	if err != nil {
+		return 0, err
+	}
+
+	fullPathWithRoot := fmt.Sprintf("%s/%s", s.StoreOpts.Root, pathkey.Fullpath())
+	//creating new file
+	file, err := os.Create(fullPathWithRoot)
+	if err != nil {
+		return 0, nil
+	}
+
+	n, err := encrypt.CopyDecrypt(encKey, r, file)
+	if err != nil {
+		return 0, err
+	}
+
+	return int64(n), nil
 }
 
 // returns file size being streamed
@@ -179,10 +205,5 @@ func (s *Store) writeStream(key string, r io.Reader) (int64, error) {
 		return 0, nil
 	}
 
-	n, err := io.Copy(file, r)
-	if err != nil {
-		return 0, err
-	}
-
-	return n, nil
+	return io.Copy(file, r)
 }

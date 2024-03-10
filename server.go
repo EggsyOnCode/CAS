@@ -147,7 +147,8 @@ func (f *FileServer) Get(key string) (io.Reader, error) {
 		// reading file size first to limit hte reading bytes sot htat hte reader doesnt' hang
 		var fileSize int64
 		binary.Read(peer, binary.LittleEndian, &fileSize)
-		n, err := f.store.Write(key, io.LimitReader(peer, fileSize))
+
+		n, err := f.store.WriteDecrypt(f.EncKey, key, io.LimitReader(peer, fileSize))
 		if err != nil {
 			return nil, err
 		}
@@ -181,7 +182,7 @@ func (f *FileServer) StoreData(key string, r io.Reader) error {
 	if err := f.broadcast(&msg); err != nil {
 		return err
 	}
-	time.Sleep(time.Microsecond * 10)
+	time.Sleep(time.Microsecond * 20)
 
 	//add multiwriters here to write buf filebuff into the peers
 
@@ -273,6 +274,9 @@ func (f *FileServer) handleMsgGetData(from string, msg MessageGetFile) error {
 	binary.Write(peer, binary.LittleEndian, fileSize)
 
 	n, err := io.Copy(peer, file)
+	if err != nil {
+		return err
+	}
 	if err != nil {
 		return err
 	}
