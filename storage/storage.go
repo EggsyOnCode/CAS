@@ -138,8 +138,8 @@ func (s *Store) GetFileSize(key string) (int64, error) {
 
 // Reading file contents using its key
 // TODO: instead of copying the returned reader to a buffer, we can return the reader directly
-func (s *Store) Read(key string) (io.Reader, error) {
-	f, err := s.readStream(key)
+func (s *Store) Read(key string, ext string) (io.Reader, error) {
+	f, err := s.readStream(key, ext)
 	if err != nil {
 		return nil, err
 	}
@@ -149,9 +149,12 @@ func (s *Store) Read(key string) (io.Reader, error) {
 	return buf, err
 }
 
-func (s *Store) readStream(key string) (io.ReadCloser, error) {
+func (s *Store) readStream(key string, ext string) (io.ReadCloser, error) {
 	pathkey := s.PathTransformFunc(key)
 	fullPathWithRoot := fmt.Sprintf("%s/%s", s.StoreOpts.Root, pathkey.Fullpath())
+	if ext != "" {
+		fullPathWithRoot = fullPathWithRoot + "." + ext
+	}
 	return os.Open(fullPathWithRoot)
 }
 
@@ -159,19 +162,20 @@ func (s *Store) Write(key string, r io.Reader) (int64, error) {
 	return s.writeStream(key, r)
 }
 
-func (s *Store) WriteDecrypt(encKey []byte, key string, r io.Reader) (int64, error) {
+func (s *Store) WriteDecrypt(encKey []byte, key string, r io.Reader) (string, int64, error) {
 	//creating new file
 	file, err := s.openFileForWriting(key)
 	if err != nil {
-		return 0, nil
+		return "", 0, nil
 	}
 
-	n, err := encrypt.CopyDecrypt(encKey, r, file)
+	ext, n, err := encrypt.CopyDecrypt(encKey, r, file)
 	if err != nil {
-		return 0, err
+		return "", 0, nil
 	}
+	os.Rename(file.Name(), file.Name()+"."+ext)
 
-	return int64(n), nil
+	return ext, int64(n), nil
 }
 func (s *Store) openFileForWriting(key string) (*os.File, error) {
 	pathkey := s.PathTransformFunc(key)

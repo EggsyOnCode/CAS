@@ -128,7 +128,7 @@ func (f *FileServer) broadcast(msg *Message) error {
 // and store it in its local store with the exact same pathName
 func (f *FileServer) Get(key string) (io.Reader, error) {
 	if f.store.Has(key) {
-		return f.store.Read(key)
+		return f.store.Read(key, "")
 	}
 
 	fmt.Printf("file not found in local store, fetching from network\n")
@@ -143,12 +143,18 @@ func (f *FileServer) Get(key string) (io.Reader, error) {
 		return nil, err
 	}
 	time.Sleep(time.Microsecond * 10)
-	for _, peer := range f.peers {
-		// reading file size first to limit hte reading bytes sot htat hte reader doesnt' hang
-		var fileSize int64
-		binary.Read(peer, binary.LittleEndian, &fileSize)
+	var ext string
+	var n int64
+	var err error
 
-		n, err := f.store.WriteDecrypt(f.EncKey, key, io.LimitReader(peer, fileSize))
+	for _, peer := range f.peers {
+		// Reading file size first to limit the reading bytes so that the reader doesn't hang
+		var fileSize int64
+		if err := binary.Read(peer, binary.LittleEndian, &fileSize); err != nil {
+			return nil, err
+		}
+
+		ext, n, err = f.store.WriteDecrypt(f.EncKey, key, io.LimitReader(peer, fileSize))
 		if err != nil {
 			return nil, err
 		}
@@ -157,7 +163,8 @@ func (f *FileServer) Get(key string) (io.Reader, error) {
 		peer.CloseStream()
 	}
 
-	return f.store.Read(key)
+	return f.store.Read(key, ext)
+
 }
 
 func (f *FileServer) StoreData(key string, r io.Reader) error {
@@ -250,7 +257,7 @@ func (f *FileServer) handleMsgGetData(from string, msg MessageGetFile) error {
 
 	//fetch the file from the network
 	//send the file to the requesting peer
-	file, err := f.store.Read(msg.Key)
+	file, err := f.store.Read(msg.Key, "")
 	if err != nil {
 		return err
 	}
@@ -313,7 +320,6 @@ func (f *FileServer) Start() error {
 	f.loop()
 	return nil
 }
-
 func init() {
 	gob.Register(MessageGetFile{})
 	gob.Register(MessageStoreFile{})

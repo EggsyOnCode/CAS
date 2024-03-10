@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"testing"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,7 +22,7 @@ func TestCopyEncryptnDecrypt(t *testing.T) {
 	assert.Equal(t, len(payload)+16, len(dst.String()))
 	//testing decrypt
 	out := new(bytes.Buffer)
-	randN, err:= CopyDecrypt(key, dst, out)
+	randN, err := CopyDecrypt(key, dst, out)
 	assert.Nil(t, err)
 	assert.Equal(t, n, randN)
 	fmt.Println(out.String())

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
 	"time"
 
 	"github.com/EggsyOnCode/CAS/encrypt"
@@ -38,56 +39,75 @@ func makeServer(listenAddr string, nodes ...string) *FileServer {
 func main() {
 	s1 := makeServer(":3000")
 	s2 := makeServer(":4000", ":3000")
-
+	s3 := makeServer(":5000", ":4000", ":3000")
 	// could be called in a gorotuine
 	go func() {
 		log.Fatal(s1.Start())
 	}()
 	time.Sleep(1 * time.Second)
+	go func() {
+		log.Fatal(s2.Start())
+	}()
 	//we need to make this a goroutine so that we can do other stuff whiel the server is starting otherwise the thread would be blocked here
-	go s2.Start()
+	go s3.Start()
 	time.Sleep(2 * time.Second)
+	// List of file paths
+	filePaths := []string{"./assets/resume.pdf", "./assets/vid.webm", "./assets/testpic.jpg"}
 
-	// testing by storing a pic in the network
-	// pic, err := os.Open("./assets/testpic.jpg")
-	// if err != nil {
-	// 	log.Fatal(err)
+	for i, path := range filePaths {
+		// Open the file
+		file, err := os.Open(path)
+		if err != nil {
+			log.Fatalf("Failed to open file %s: %s", path, err)
+		}
+		defer file.Close()
 
-	// }
-	// defer pic.Close()
-	// size, err := pic.Stat()
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// picBuf := make([]byte, size.Size())
-	// if _, err := bufio.NewReader(pic).Read(picBuf); err != nil {
-	// 	log.Fatal(err)
-	// }
+		// Get file size
+		fileInfo, err := file.Stat()
+		if err != nil {
+			log.Fatalf("Failed to get file info for %s: %s", path, err)
+		}
 
-	for i := 1; i < 2; i++ {
-		var testData []byte = []byte("this is new jpg file")
-		data := bytes.NewReader(testData)
-		s2.StoreData(fmt.Sprintf("pic_%d", i), data)
+		// Read file content into a buffer
+		fileBuffer := make([]byte, fileInfo.Size())
+		if _, err := file.Read(fileBuffer); err != nil {
+			log.Fatalf("Failed to read file %s: %s", path, err)
+		}
+
+		// Create a reader for the file content
+		fileReader := bytes.NewReader(fileBuffer)
+
+		// Store file data
+		key := fmt.Sprintf("file_%d", i+1)
+		if err := s3.StoreData(key, fileReader); err != nil {
+			log.Fatalf("Failed to store file %s data: %s", path, err)
+		}
+		fmt.Printf("Stored file %s data with key: %s\n", path, key)
+
+		// Simulate fetching the file from the network
 		time.Sleep(20 * time.Millisecond)
-	}
 
-	// deleting the local copy of the file to fetch it from the network
-	if err := s2.store.Delete("pic_1"); err != nil {
-		log.Fatal(err)
-	}
+		// Delete the local copy of the file
+		if err := s3.store.Delete(key); err != nil {
+			log.Fatalf("Failed to delete file %s: %s", key, err)
+		}
+		fmt.Printf("Deleted local copy of file %s\n", key)
 
-	for i := 1; i < 2; i++ {
-
-		n, err := s2.Get(fmt.Sprintf("pic_%d", i))
+		// Fetch the file from the network
+		fetchedFile, err := s3.Get(key)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("Failed to fetch file %s: %s", key, err)
 		}
 
-		b, err := ioutil.ReadAll(n)
+		// Read fetched file content
+		fetchedFileContent, err := ioutil.ReadAll(fetchedFile)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("Failed to read fetched file %s content: %s ; the content was", key, err, fetchedFileContent)
 		}
-		fmt.Printf("{%s} is the data of ur file\n", string(b))
+
+		// Print fetched file content
+		// fmt.Printf("Fetched file %s content: %s\n", key, fetchedFileContent)
 	}
+
 	select {}
 }
