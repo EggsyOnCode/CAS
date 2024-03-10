@@ -160,16 +160,8 @@ func (s *Store) Write(key string, r io.Reader) (int64, error) {
 }
 
 func (s *Store) WriteDecrypt(encKey []byte, key string, r io.Reader) (int64, error) {
-	pathkey := s.PathTransformFunc(key)
-	fullFolderPathWithRoot := s.StoreOpts.Root + "/" + pathkey.PathName
-	err := os.MkdirAll(fullFolderPathWithRoot, os.ModePerm)
-	if err != nil {
-		return 0, err
-	}
-
-	fullPathWithRoot := fmt.Sprintf("%s/%s", s.StoreOpts.Root, pathkey.Fullpath())
 	//creating new file
-	file, err := os.Create(fullPathWithRoot)
+	file, err := s.openFileForWriting(key)
 	if err != nil {
 		return 0, nil
 	}
@@ -181,6 +173,18 @@ func (s *Store) WriteDecrypt(encKey []byte, key string, r io.Reader) (int64, err
 
 	return int64(n), nil
 }
+func (s *Store) openFileForWriting(key string) (*os.File, error) {
+	pathkey := s.PathTransformFunc(key)
+	fullFolderPathWithRoot := s.StoreOpts.Root + "/" + pathkey.PathName
+	err := os.MkdirAll(fullFolderPathWithRoot, os.ModePerm)
+	if err != nil {
+		return nil, err
+	}
+
+	fullPathWithRoot := fmt.Sprintf("%s/%s", s.StoreOpts.Root, pathkey.Fullpath())
+	//creating new file
+	return os.Create(fullPathWithRoot)
+}
 
 // returns file size being streamed
 func (s *Store) writeStream(key string, r io.Reader) (int64, error) {
@@ -191,16 +195,8 @@ func (s *Store) writeStream(key string, r io.Reader) (int64, error) {
 	// in that path we'll create a new file
 	// we'll copy the contents of the io.Reader into that buffer/file
 
-	pathkey := s.PathTransformFunc(key)
-	fullFolderPathWithRoot := s.StoreOpts.Root + "/" + pathkey.PathName
-	err := os.MkdirAll(fullFolderPathWithRoot, os.ModePerm)
-	if err != nil {
-		return 0, err
-	}
-
-	fullPathWithRoot := fmt.Sprintf("%s/%s", s.StoreOpts.Root, pathkey.Fullpath())
 	//creating new file
-	file, err := os.Create(fullPathWithRoot)
+	file, err := s.openFileForWriting(key)
 	if err != nil {
 		return 0, nil
 	}

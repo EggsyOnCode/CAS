@@ -184,19 +184,21 @@ func (f *FileServer) StoreData(key string, r io.Reader) error {
 	}
 	time.Sleep(time.Microsecond * 20)
 
-	//add multiwriters here to write buf filebuff into the peers
+	peers := []io.Writer{}
 
+	for _, peer := range f.peers {
+		peers = append(peers, peer)
+	}
+	mw := io.MultiWriter(peers...)
+	//inform all the peers abut the incoming stream
+	mw.Write([]byte{p2p.IncomingStream})
+	n, err := encrypt.CopyEncrypt(f.EncKey, fileBuffer, mw)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("[%s] received and writte %d bytes to disk\n", f.Transporter.Addr(), n)
 	// data from buf i.e hte file data is being copied over to each peer (in the network)
 	// because peer is also an io.Writer so we can use io.Copy to copy the data to it
-	for _, peer := range f.peers {
-		peer.Send([]byte{p2p.IncomingStream})
-		n, err := encrypt.CopyEncrypt(f.EncKey, fileBuffer, peer)
-		if err != nil {
-			return err
-		}
-
-		fmt.Printf("[%s] sent %d bytes to %s\n", f.Transporter.Addr(), n, peer.RemoteAddr().String())
-	}
 	return nil
 }
 

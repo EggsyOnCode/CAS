@@ -64,29 +64,30 @@ func main() {
 	// 	log.Fatal(err)
 	// }
 
-	// for i := 1; i < 2; i++ {
-	var testData []byte = []byte("this is new jpg file")
-	data := bytes.NewReader(testData)
-	s2.StoreData("pic_1", data)
-	time.Sleep(20 * time.Millisecond)
-	// }
+	for i := 1; i < 2; i++ {
+		var testData []byte = []byte("this is new jpg file")
+		data := bytes.NewReader(testData)
+		s2.StoreData(fmt.Sprintf("pic_%d", i), data)
+		time.Sleep(20 * time.Millisecond)
+	}
 
+	// deleting the local copy of the file to fetch it from the network
 	if err := s2.store.Delete("pic_1"); err != nil {
 		log.Fatal(err)
 	}
 
-	// for i := 1; i < 2; i++ {
+	for i := 1; i < 2; i++ {
 
-	n, err := s2.Get("pic_1")
-	if err != nil {
-		log.Fatal(err)
-	}
+		n, err := s2.Get(fmt.Sprintf("pic_%d", i))
+		if err != nil {
+			log.Fatal(err)
+		}
 
-	b, err := ioutil.ReadAll(n)
-	if err != nil {
-		log.Fatal(err)
+		b, err := ioutil.ReadAll(n)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("{%s} is the data of ur file\n", string(b))
 	}
-	fmt.Printf("{%s} is the data of ur file\n", string(b))
-	// }
 	select {}
 }
