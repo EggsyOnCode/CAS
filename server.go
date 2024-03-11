@@ -126,6 +126,7 @@ func (f *FileServer) broadcast(msg *Message) error {
 
 // it will look for the file in the local store and if not found it will fetch it from the network
 // and store it in its local store with the exact same pathName
+// method invoked byu teh requesting peer
 func (f *FileServer) Get(key string) (io.Reader, error) {
 	if f.store.Has(key) {
 		return f.store.Read(key, "")
@@ -147,6 +148,7 @@ func (f *FileServer) Get(key string) (io.Reader, error) {
 	var n int64
 	var err error
 
+	//peer is the io.reader (the pipe that the peers have written the file to )
 	for _, peer := range f.peers {
 		// Reading file size first to limit the reading bytes so that the reader doesn't hang
 		var fileSize int64
@@ -173,11 +175,11 @@ func (f *FileServer) StoreData(key string, r io.Reader) error {
 
 	fileBuffer := new(bytes.Buffer)
 	tee := io.TeeReader(r, fileBuffer)
-	//returned is file size
 	size, err := f.store.Write(key, tee)
 	if err != nil {
 		return err
 	}
+	//returned is file size
 	msg := Message{
 		Payload: MessageStoreFile{
 			Key: key,
@@ -249,14 +251,14 @@ func (f *FileServer) handleMsg(from string, msg *Message) error {
 	return nil
 }
 
+// method invoked by the peer whom we have requeted the file from
 func (f *FileServer) handleMsgGetData(from string, msg MessageGetFile) error {
 	//check if the file is in the local store
 	if !f.store.Has(msg.Key) {
 		return fmt.Errorf("need to serve file (%s) but file not found", msg.Key)
 	}
 
-	//fetch the file from the network
-	//send the file to the requesting peer
+	//fetch the file from the network send the file to the requesting peer
 	file, err := f.store.Read(msg.Key, "")
 	if err != nil {
 		return err

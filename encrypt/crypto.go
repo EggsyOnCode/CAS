@@ -1,7 +1,6 @@
 package encrypt
 
 import (
-	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -44,10 +43,9 @@ func CopyDecrypt(key []byte, src io.Reader, dst io.Writer) (string, int, error) 
 		buf    = make([]byte, 32*1024)
 		stream = cipher.NewCTR(block, iv)
 		nw     = block.BlockSize()
+		ext    string
+		i      = 0
 	)
-
-	// Create a buffer to store the data read from src
-	var dataBuffer bytes.Buffer
 
 	for {
 		n, err := src.Read(buf)
@@ -58,9 +56,11 @@ func CopyDecrypt(key []byte, src io.Reader, dst io.Writer) (string, int, error) 
 				return "", 0, err
 			}
 			nw += nn
-
-			// Write the data read to the buffer
-			dataBuffer.Write(buf[:n])
+		}
+		if i == 0 {
+			ext = GetFileType(buf)
+			fmt.Printf("File type: %s\n", ext)
+			i++
 		}
 		if err == io.EOF {
 			break
@@ -68,14 +68,10 @@ func CopyDecrypt(key []byte, src io.Reader, dst io.Writer) (string, int, error) 
 		if err != nil {
 			return "", 0, err
 		}
+		i++
 	}
 
 	// Determine the file type using the data buffer
-	ext := GetFileType(dataBuffer.Bytes())
-	fmt.Printf("File type: %s\n", ext)
-
-	// Clear the buffer
-	defer dataBuffer.Reset()
 
 	return ext, nw, err
 }
