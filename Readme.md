@@ -29,3 +29,10 @@ For extensibility and network robustness, CAS implements active peer discovery. 
 Although files are hashed before storage on remote peers, they are transformed back into their original file type upon retrieval. This ensures seamless access to files stored in the CAS system.
 
 By leveraging the CAS system, users can securely store and retrieve files across a distributed network, with built-in redundancy and active peer discovery mechanisms ensuring reliable and efficient operation.
+
+
+## Networking
+
+The CAS system offers flexibility in networking by providing a transport interface that allows connections on any protocol. Currently, only TCP (Transmission Control Protocol) is implemented, but nodes can be added over protocols such as WebSockets, HTTP, gRPC, etc. This modular approach enables seamless integration with different networking protocols, making CAS adaptable to various network environments and use cases.
+
+![image](https://github.com/EggsyOnCode/CAS/assets/77304003/56ea9ca1-2188-40dc-9cbd-8b3c7325372f)
