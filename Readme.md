@@ -36,3 +36,22 @@ By leveraging the CAS system, users can securely store and retrieve files across
 The CAS system offers flexibility in networking by providing a transport interface that allows connections on any protocol. Currently, only TCP (Transmission Control Protocol) is implemented, but nodes can be added over protocols such as WebSockets, HTTP, gRPC, etc. This modular approach enables seamless integration with different networking protocols, making CAS adaptable to various network environments and use cases.
 
 ![image](https://github.com/EggsyOnCode/CAS/assets/77304003/56ea9ca1-2188-40dc-9cbd-8b3c7325372f)
+
+
+
+# How to setup and run locally
+
+Clone to project then cd into it
+
+Download the dependencies via 
+
+```bash
+go mod download
+```
+
+then run the server using 
+```bash
+make run
+```
+
+- to update the network ports head over to main.go and make necesary updates in s1, s2, and s3.
