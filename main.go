@@ -40,7 +40,6 @@ func main() {
 	s1 := makeServer(":3000")
 	s2 := makeServer(":4000", ":3000")
 	s3 := makeServer(":5000", ":4000", ":3000")
-	// could be called in a gorotuine
 	go func() {
 		log.Fatal(s1.Start())
 	}()
@@ -52,7 +51,7 @@ func main() {
 	go s3.Start()
 	time.Sleep(2 * time.Second)
 	// List of file paths
-	filePaths := []string{"./assets/resume.pdf", "./assets/compress.zip", "./assets/testpic.jpg"}
+	filePaths := []string{"./assets/resume.pdf"}
 
 	go func() {
 		for i, path := range filePaths {

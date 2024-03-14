@@ -41,7 +41,8 @@ func NewTPCPeer(conn net.Conn, outbound bool) *TCPPeer {
 		wg:       &sync.WaitGroup{},
 	}
 }
-//implements the CloseStream method of the Peer interface
+
+// implements the CloseStream method of the Peer interface
 func (tp *TCPPeer) CloseStream() {
 	tp.wg.Done()
 }
@@ -108,6 +109,7 @@ func (tr *TCPTransporter) startAcceptLoop() {
 	}
 
 }
+
 
 // implements the Dial interface of Transporter
 func (s *TCPTransporter) Dial(address string) error {

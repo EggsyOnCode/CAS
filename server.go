@@ -49,6 +49,9 @@ type MessageStoreFile struct {
 type MessageGetFile struct {
 	Key string
 }
+type MessagePeerList struct {
+	Peers []string
+}
 
 func NewFileServer(opts FileServerOpts) *FileServer {
 	storeOpts := storage.StoreOpts{
@@ -227,11 +230,14 @@ func (f *FileServer) loop() {
 			var msg Message
 			// decoding the msg
 			if err := gob.NewDecoder(bytes.NewReader(rpc.Payload)).Decode(&msg); err != nil {
-				log.Printf("error decoding msg %s", err)
-
+				if err == io.ErrUnexpectedEOF {
+					log.Printf("error decoding msg: %s", err)
+					continue // Skip handling this message and continue to the next one
+				}
+				log.Printf("error decoding msg: %s", err)
 			}
 			if err := f.handleMsg(rpc.From.String(), &msg); err != nil {
-				log.Printf("error handling msg %s", err)
+				log.Printf("error handling msg: %s", err)
 			}
 
 		case <-f.quitch: //when channel quits
@@ -246,8 +252,21 @@ func (f *FileServer) handleMsg(from string, msg *Message) error {
 		return f.handleMsgStoreData(from, v)
 	case MessageGetFile:
 		return f.handleMsgGetData(from, v)
+	case MessagePeerList:
+		return f.handlePeerListRec(from, v)
 	}
 
+	return nil
+}
+func (f *FileServer) handlePeerListRec(from string, msg MessagePeerList) error {
+	//add the peers to the local peer list
+	for _, peer := range msg.Peers {
+		if f.isInPeerList(peer) {
+			continue
+		}
+		f.Transporter.Dial(peer)
+	}
+	fmt.Printf("peer list received from %s and updated with %d peers\n", from, len(f.peers))
 	return nil
 }
 
@@ -318,11 +337,52 @@ func (f *FileServer) Start() error {
 
 	// when the file server starts connect to bootstrap nodes
 	f.bootStrapNodes()
+
+	go f.Gossip() // Invoke f.Gossip() in a separate goroutine
+
 	// start the loop i.e the server daemon
 	f.loop()
 	return nil
 }
+
+
+func (f *FileServer) Gossip() {
+	go func() {
+		ticker := time.NewTicker(60 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				f.sendPeerList()
+			}
+		}
+	}()
+}
+
+func (f *FileServer) sendPeerList() {
+	peerList := make([]string, 0, len(f.peers)) // Initialize peerList with capacity equal to the number of peers
+	for _, p := range f.peers {
+		peerList = append(peerList, p.RemoteAddr().String())
+	}
+	peerListMsg := Message{
+		Payload: MessagePeerList{
+			Peers: peerList,
+		},
+	}
+	f.broadcast(&peerListMsg)
+}
+func (f *FileServer) isInPeerList(addr string) bool {
+	peers := f.peers
+	for _, p := range peers {
+		if p.RemoteAddr().String() == addr {
+			return true
+		}
+	}
+	return false
+}
 func init() {
 	gob.Register(MessageGetFile{})
 	gob.Register(MessageStoreFile{})
+	gob.Register(MessagePeerList{})
 }
